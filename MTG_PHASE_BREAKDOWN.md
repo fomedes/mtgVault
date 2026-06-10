@@ -47,6 +47,8 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 0 — Foundation & Tooling
 
+> **Status (2026-06-11):** P0-01 … P0-17 implemented and verified locally (typecheck, lint, 17 unit tests, 3 E2E smoke tests, production build — all green). Remaining for exit: owner completes SETUP.md (Firebase project, Atlas cluster, `.env.local`, allowlist seed), verifies live sign-in, and pushes to GitHub to light up CI.
+
 **Goal:** A running skeleton: Next.js + Tailwind + Firebase allowlist auth + MongoDB wired up, Socket.io server booting, CI green.
 **Manual prerequisites (project owner):** create the Firebase project (Google provider enabled), the MongoDB Atlas M0 cluster, and a GitHub repo; paste credentials into `.env.local`.
 
