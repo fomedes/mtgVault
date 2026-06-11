@@ -16,7 +16,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "seed:allowlist": "tsx scripts/seed-allowlist.ts"
+    "seed:allowlist": "tsx scripts/seed-allowlist.ts",
+    "seed:sets": "tsx scripts/seed-sets.ts",
+    "sync:set": "tsx scripts/sync-set.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -47,6 +49,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "mongodb-memory-server": "^11.2.0",
     "prettier": "^3.8.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
