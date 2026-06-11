@@ -1,22 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const SESSION_KEY = "daily-claim-date";
+
 /**
- * Fires POST /api/daily-claim exactly once per mount (guarded by ref so React
- * Strict Mode double-invoke does not trigger a second claim). If the server
- * awards a bonus it calls router.refresh() so the server-rendered balance
- * on the dashboard updates without a full reload.
+ * Fires POST /api/daily-claim once per calendar day per browser session.
+ * sessionStorage persists across in-session navigation (no re-fire on every
+ * dashboard mount) and is cleared when the browser tab closes, so the next
+ * session tries again (server is still idempotent — the second gate).
  */
 export function DailyClaim() {
   const router = useRouter();
-  const firedRef = useRef(false);
   const [bonus, setBonus] = useState(0);
 
   useEffect(() => {
-    if (firedRef.current) return;
-    firedRef.current = true;
+    const today = new Date().toISOString().slice(0, 10); // "2026-06-12"
+
+    // Don't fire again if we already attempted a claim today in this session.
+    if (sessionStorage.getItem(SESSION_KEY) === today) return;
+
+    // Mark immediately before the fetch so concurrent mounts (Strict Mode)
+    // don't both fire.
+    sessionStorage.setItem(SESSION_KEY, today);
 
     fetch("/api/daily-claim", { method: "POST" })
       .then((r) => (r.ok ? r.json() : null))
@@ -24,7 +31,7 @@ export function DailyClaim() {
         (d: { claimed: boolean; bonus: number; isFirstTime?: boolean } | null) => {
           if (d?.claimed && d.bonus > 0) {
             setBonus(d.bonus);
-            router.refresh(); // re-fetches server components so balance is current
+            router.refresh();
           }
         },
       )
