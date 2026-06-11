@@ -82,6 +82,8 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 1 — Card Browser
 
+> **Status (2026-06-11):** P1-01 … P1-09, P1-11, P1-12 implemented and verified locally (lint, typecheck, 74 unit/integration tests, 7 E2E tests incl. authenticated browse + DFC flip, production build — all green). All 12 curated sets (KTK, DOM, MH2, NEO, ONE, LTR, WOE, LCI, MKM, OTJ, BLB, DSK — 5,360 cards) synced into Atlas; warm re-sync confirmed at zero Scryfall requests. Browse UX decision: infinite scroll with URL-synced filters. Remaining for exit: P1-10 Vercel deploy (owner-guided) + CI green on main.
+
 **Goal:** Browse and search the curated sets with full card detail, backed by a Scryfall cache layer that respects API etiquette.
 
 | ID    | Task                                                                                                                                                                                                                                                                                                                                                  | Agent(s)     | Depends on          |

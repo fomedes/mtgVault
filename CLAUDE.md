@@ -25,7 +25,8 @@ pnpm typecheck     # tsc --noEmit
 pnpm test          # Vitest unit/integration
 pnpm test:e2e      # Playwright
 pnpm build         # production build
-pnpm sync:set <code>  # sync one Scryfall set into the cache
+pnpm seed:sets     # upsert the curated set list (enabled flags)
+pnpm sync:set <code>  # sync one Scryfall set into the cache (--all for every enabled set)
 ```
 
 (Created during Phase 0 — keep this list in sync as scripts land.)
