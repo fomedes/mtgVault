@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { getCurrentUser } from "@/lib/auth/session";
 
@@ -33,9 +34,18 @@ export default async function DashboardPage() {
         ))}
       </section>
 
-      <p className="text-muted-foreground text-sm">
-        The card browser arrives in Phase 1. Hang tight, planeswalker.
-      </p>
+      <section>
+        <Link
+          href="/cards"
+          className="bg-card hover:bg-muted/60 focus-visible:ring-ring/50 block rounded-lg border p-6 transition-colors outline-none focus-visible:ring-3"
+        >
+          <p className="font-semibold">Browse cards →</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Explore the curated sets in the vault — filters, search, rulings and
+            all.
+          </p>
+        </Link>
+      </section>
     </main>
   );
 }
