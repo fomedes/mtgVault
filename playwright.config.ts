@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config } from "dotenv";
+
+// Authenticated E2E specs need the real credentials; harmless if absent.
+config({ path: ".env.local" });
 
 export default defineConfig({
   testDir: "./e2e",
