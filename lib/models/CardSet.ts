@@ -21,6 +21,7 @@ const cardSetSchema = new Schema({
   releasedAt: { type: Date },
   iconSvgUri: { type: String, default: "" },
   enabled: { type: Boolean, default: false },
+  boosterPrice: { type: Number, default: 100, min: 0 },
   cachedAt: { type: Date },
   cardsSyncedAt: { type: Date },
 });

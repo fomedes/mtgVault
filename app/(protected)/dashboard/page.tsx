@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { getCollectionStats } from "@/lib/game/collection";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function DashboardPage() {
-  // Re-use guardApiRequest to get the user doc (it's already cached by the layout).
-  // We call getCurrentUser directly since this is a Server Component, not an API route.
-  const { getCurrentUser } = await import("@/lib/auth/session");
   const user = await getCurrentUser();
-  if (!user) return null; // layout already redirects
+  if (!user) return null;
 
   const { uniqueCards, totalCards } = await getCollectionStats(user.uid);
 
@@ -19,8 +17,8 @@ export default async function DashboardPage() {
             Welcome, {user.displayName || user.email}
           </h1>
           <p className="text-muted-foreground text-sm">
-            {user.role === "admin" ? "Admin" : "Drafter"} · {user.vaultCoins}{" "}
-            Vault Coins
+            {user.role === "admin" ? "Admin" : "Drafter"} ·{" "}
+            <span className="text-foreground font-semibold">{user.vaultCoins} Vault Coins</span>
           </p>
         </div>
         <SignOutButton />
@@ -41,6 +39,15 @@ export default async function DashboardPage() {
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link
+          href="/shop"
+          className="bg-card hover:bg-muted/60 focus-visible:ring-ring/50 block rounded-lg border p-6 transition-colors outline-none focus-visible:ring-3"
+        >
+          <p className="font-semibold">Shop →</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Spend Vault Coins to open booster packs and add cards to your collection.
+          </p>
+        </Link>
+        <Link
           href="/collection"
           className="bg-card hover:bg-muted/60 focus-visible:ring-ring/50 block rounded-lg border p-6 transition-colors outline-none focus-visible:ring-3"
         >
@@ -55,10 +62,20 @@ export default async function DashboardPage() {
         >
           <p className="font-semibold">Browse cards →</p>
           <p className="text-muted-foreground mt-1 text-sm">
-            Explore the curated sets in the vault — filters, search, rulings and
-            all.
+            Explore the curated sets — filters, search, rulings and all.
           </p>
         </Link>
+        {user.role === "admin" ? (
+          <Link
+            href="/admin"
+            className="bg-card hover:bg-muted/60 focus-visible:ring-ring/50 block rounded-lg border p-6 transition-colors outline-none focus-visible:ring-3"
+          >
+            <p className="font-semibold">Admin →</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Manage users, allowlist, sets, and pack prices.
+            </p>
+          </Link>
+        ) : null}
       </section>
     </main>
   );

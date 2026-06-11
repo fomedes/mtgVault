@@ -48,3 +48,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# session progress notes (not part of the repo)
+/PHASE_PROGRESS/

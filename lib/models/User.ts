@@ -16,6 +16,7 @@ const userSchema = new Schema(
     vaultCoins: { type: Number, default: 0, min: 0 },
     isAllowlisted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
+    lastDailyBonusAt: { type: Date },
   },
   { timestamps: true },
 );
