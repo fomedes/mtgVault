@@ -11,7 +11,8 @@ export default async function ShopPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">Shop</h1>
         <p className="text-muted-foreground text-sm">
-          Balance: <span className="text-foreground font-semibold">{user.vaultCoins} VC</span>
+          Balance:{" "}
+          <span className="text-foreground font-semibold">{user.vaultCoins} VC</span>
           {" · "}Open a booster to add cards to your collection.
         </p>
       </header>

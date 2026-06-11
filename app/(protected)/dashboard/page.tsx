@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { DailyClaim } from "@/components/layout/daily-claim";
 import { getCollectionStats } from "@/lib/game/collection";
 import { getCurrentUser } from "@/lib/auth/session";
 
@@ -11,18 +11,19 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome, {user.displayName || user.email}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            {user.role === "admin" ? "Admin" : "Drafter"} ·{" "}
-            <span className="text-foreground font-semibold">{user.vaultCoins} Vault Coins</span>
-          </p>
-        </div>
-        <SignOutButton />
+      <header className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Welcome, {user.displayName || user.email}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {user.role === "admin" ? "Admin" : "Drafter"} ·{" "}
+          <span className="text-foreground font-semibold">
+            {user.vaultCoins} Vault Coins
+          </span>
+        </p>
       </header>
+
+      <DailyClaim />
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
@@ -44,7 +45,7 @@ export default async function DashboardPage() {
         >
           <p className="font-semibold">Shop →</p>
           <p className="text-muted-foreground mt-1 text-sm">
-            Spend Vault Coins to open booster packs and add cards to your collection.
+            Spend Vault Coins to open booster packs and grow your collection.
           </p>
         </Link>
         <Link

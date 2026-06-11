@@ -17,7 +17,7 @@ interface PurchaseResult {
   packCount: number;
 }
 
-export function ShopBrowser({ onDailyClaim }: { onDailyClaim?: (bonus: number) => void }) {
+export function ShopBrowser() {
   const [data, setData] = useState<ShopData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,19 +26,6 @@ export function ShopBrowser({ onDailyClaim }: { onDailyClaim?: (bonus: number) =
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Claim daily bonus on mount (idempotent — server rejects if already claimed)
-    fetch("/api/daily-claim", { method: "POST" })
-      .then((r) => r.json())
-      .then((d: { claimed: boolean; bonus: number; newBalance: number }) => {
-        if (d.claimed && d.bonus > 0) {
-          onDailyClaim?.(d.bonus);
-          setData((prev) =>
-            prev ? { ...prev, balance: d.newBalance } : prev,
-          );
-        }
-      })
-      .catch(() => undefined);
-
     fetch("/api/shop")
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load shop");
@@ -52,7 +39,7 @@ export function ShopBrowser({ onDailyClaim }: { onDailyClaim?: (bonus: number) =
         setError(e.message);
         setIsLoading(false);
       });
-  }, [onDailyClaim]);
+  }, []);
 
   async function handleBuy(setCode: string) {
     if (!data) return;

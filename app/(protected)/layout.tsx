@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Nav } from "@/components/layout/nav";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function ProtectedLayout({
@@ -6,5 +7,11 @@ export default async function ProtectedLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  return <>{children}</>;
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Nav role={user.role ?? "user"} />
+      <div className="flex flex-1 flex-col">{children}</div>
+    </div>
+  );
 }

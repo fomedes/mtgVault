@@ -1,0 +1,67 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { cn } from "@/lib/utils";
+
+const LINKS = [
+  { href: "/dashboard", label: "Home" },
+  { href: "/shop", label: "Shop" },
+  { href: "/collection", label: "Collection" },
+  { href: "/cards", label: "Browse" },
+];
+
+export function Nav({ role }: { role: string }) {
+  const pathname = usePathname();
+
+  const isActive = (href: string) =>
+    href === "/dashboard"
+      ? pathname === "/dashboard"
+      : pathname.startsWith(href);
+
+  return (
+    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <nav className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
+        <Link
+          href="/dashboard"
+          className="text-sm font-bold tracking-tight shrink-0 mr-2"
+        >
+          MTG Vault
+        </Link>
+
+        <div className="flex flex-1 items-center gap-0.5 overflow-x-auto">
+          {LINKS.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm transition-colors whitespace-nowrap",
+                isActive(href)
+                  ? "bg-muted text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+              )}
+            >
+              {label}
+            </Link>
+          ))}
+          {role === "admin" ? (
+            <Link
+              href="/admin"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm transition-colors whitespace-nowrap",
+                isActive("/admin")
+                  ? "bg-muted text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+              )}
+            >
+              Admin
+            </Link>
+          ) : null}
+        </div>
+
+        <SignOutButton />
+      </nav>
+    </header>
+  );
+}
