@@ -24,9 +24,11 @@ export function frontImage(card: CardListItemDto) {
 export function CardTile({
   card,
   onClick,
+  owned = false,
 }: {
   card: CardListItemDto;
   onClick?: () => void;
+  owned?: boolean;
 }) {
   const { cardHover } = useCardAnimations();
   const image = frontImage(card);
@@ -53,6 +55,14 @@ export function CardTile({
         typeLine={card.typeLine || face?.typeLine}
         colorIdentity={card.colorIdentity}
       />
+      {owned ? (
+        <span
+          className="pointer-events-none absolute top-1.5 left-1.5 rounded-full bg-emerald-600/90 px-1.5 py-0.5 text-[9px] font-bold text-white"
+          aria-label="Owned"
+        >
+          ✓
+        </span>
+      ) : null}
     </motion.button>
   );
 }

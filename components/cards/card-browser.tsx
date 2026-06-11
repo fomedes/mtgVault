@@ -18,6 +18,19 @@ import { useInfiniteCards } from "@/hooks/use-infinite-cards";
 
 const NAME_DEBOUNCE_MS = 300;
 
+function useOwnedIds(): Set<string> {
+  const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetch("/api/collection/ids")
+      .then((res) => (res.ok ? res.json() : { scryfallIds: [] }))
+      .then((data: { scryfallIds: string[] }) =>
+        setOwnedIds(new Set(data.scryfallIds)),
+      )
+      .catch(() => undefined);
+  }, []);
+  return ownedIds;
+}
+
 export function CardBrowser({
   setCode,
   setName,
@@ -61,6 +74,7 @@ export function CardBrowser({
     useInfiniteCards(apiQuery);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const ownedIds = useOwnedIds();
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -113,6 +127,7 @@ export function CardBrowser({
             <CardTile
               key={card.scryfallId}
               card={card}
+              owned={ownedIds.has(card.scryfallId)}
               onClick={() => setSelectedId(card.scryfallId)}
             />
           ))}
