@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["mongoose", "firebase-admin"],
+  serverExternalPackages: [
+    "mongoose",
+    "firebase-admin",
+    "jose",
+    "jwks-rsa",
+    "@google-cloud/firestore",
+    "@google-cloud/storage",
+  ],
   images: {
     remotePatterns: [
       // Scryfall card imagery (Phase 1+)

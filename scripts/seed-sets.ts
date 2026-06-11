@@ -21,6 +21,9 @@ const CURATED_SET_CODES = [
   "otj", // Outlaws of Thunder Junction
   "blb", // Bloomburrow
   "dsk", // Duskmourn: House of Horror
+  "rtr", // Return to Ravnica
+  "ons", // Onslaught
+  "usa", // Urza's Saga
 ];
 
 async function main() {
