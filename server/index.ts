@@ -7,16 +7,21 @@ import { connectToDatabase } from "@/lib/db";
 import { getServerEnv, getSocketEnv } from "@/lib/env";
 import { getAdminAuth } from "@/lib/firebase-admin";
 import { AllowlistEntry } from "@/lib/models/AllowlistEntry";
+import { User } from "@/lib/models/User";
+import { registerLobbyHandlers } from "@/server/draft/lobby";
+import { registerDraftHandlers } from "@/server/draft/events";
+import { handleDisconnect, registerReconnectHandlers } from "@/server/draft/reconnect";
 
 interface SocketUser {
   uid: string;
   email: string;
   role: "user" | "admin";
+  displayName: string;
 }
 
 async function main() {
   const socketEnv = getSocketEnv();
-  getServerEnv(); // fail fast on missing credentials
+  getServerEnv();
   await connectToDatabase();
 
   const httpServer = createServer((req, res) => {
@@ -36,8 +41,7 @@ async function main() {
     },
   });
 
-  // Every connection must present a valid Firebase ID token for an
-  // allowlisted account. Draft handlers (Phase 4) build on socket.data.user.
+  // Auth middleware — verify Firebase ID token + allowlist on every connection.
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -49,10 +53,14 @@ async function main() {
       const entry = await AllowlistEntry.findOne({ email }).lean();
       const decision = evaluateAllowlist(entry);
       if (!decision.allowed) return next(new Error("unauthorized"));
+
+      const dbUser = await User.findOne({ uid: decoded.uid }, { displayName: 1 }).lean();
+
       socket.data.user = {
         uid: decoded.uid,
         email,
         role: decision.role,
+        displayName: dbUser?.displayName ?? email,
       } satisfies SocketUser;
       next();
     } catch {
@@ -63,8 +71,14 @@ async function main() {
   io.on("connection", (socket) => {
     const user = socket.data.user as SocketUser;
     console.log(`[socket] connected: ${user.email}`);
+
+    registerLobbyHandlers(io, socket);
+    registerDraftHandlers(io, socket);
+    registerReconnectHandlers(io, socket);
+
     socket.on("disconnect", (reason) => {
       console.log(`[socket] disconnected: ${user.email} (${reason})`);
+      handleDisconnect(io, socket, user.uid);
     });
   });
 

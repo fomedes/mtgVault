@@ -76,10 +76,13 @@ export function ShopBrowser() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="bg-muted h-36 animate-pulse rounded-xl" />
-        ))}
+      <div className="space-y-4">
+        <div className="bg-muted h-5 w-40 animate-pulse rounded" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="bg-muted h-36 animate-pulse rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -99,7 +102,12 @@ export function ShopBrowser() {
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      <p className="text-sm">
+        Balance:{" "}
+        <span className="text-foreground font-semibold">{data.balance} VC</span>
+      </p>
+
       {purchaseError ? (
         <p className="text-destructive text-sm">{purchaseError}</p>
       ) : null}
@@ -125,6 +133,6 @@ export function ShopBrowser() {
           />
         ) : null}
       </AnimatePresence>
-    </>
+    </div>
   );
 }
