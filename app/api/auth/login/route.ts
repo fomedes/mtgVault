@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { checkRateLimit } from "@/lib/auth/rate-limit";
 import {
   NotAllowlistedError,
   SESSION_COOKIE_NAME,
@@ -9,6 +10,21 @@ import {
 const bodySchema = z.object({ idToken: z.string().min(1) });
 
 export async function POST(request: Request) {
+  // Unauthenticated endpoint: brute-force protection keyed by client IP.
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const rate = checkRateLimit(`login:${ip ?? "unknown"}`, {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rate.allowed) {
+    const response = NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429 },
+    );
+    response.headers.set("Retry-After", String(rate.retryAfterSeconds));
+    return response;
+  }
+
   let body: unknown;
   try {
     body = await request.json();
