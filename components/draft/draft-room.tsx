@@ -35,7 +35,7 @@ export function DraftRoom({ myUid }: { myUid: string }) {
       `/api/cards/batch?ids=${encodeURIComponent(uncached.join(","))}`,
     )
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { cards: Parameters<typeof cacheCards>[0] } | null) => {
+      .then((d: { cards: Record<string, Parameters<typeof cacheCards>[0][string]> } | null) => {
         if (d?.cards) cacheCards(d.cards);
       })
       .catch(() => undefined);

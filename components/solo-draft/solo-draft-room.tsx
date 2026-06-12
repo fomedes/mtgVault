@@ -28,12 +28,12 @@ export function SoloDraftRoom({ initial }: Props) {
 
     fetch(`/api/cards/batch?ids=${encodeURIComponent(needed.join(","))}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { cards: CardListItemDto[] } | null) => {
+      .then((d: { cards: Record<string, CardListItemDto> } | null) => {
         if (!d?.cards) return;
         setCardCache((prev) => {
           const next = new Map(prev);
-          for (const card of d.cards) {
-            next.set(card.scryfallId, card);
+          for (const [id, card] of Object.entries(d.cards)) {
+            next.set(id, card);
           }
           return next;
         });

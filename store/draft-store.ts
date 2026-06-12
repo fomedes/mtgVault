@@ -37,7 +37,8 @@ export interface DraftStoreState {
   applyLobbyState: (s: { sessionId: string; shortCode: string; players: DraftStoreState["lobbyPlayers"]; hostUid?: string }) => void;
   applyPlayerView: (view: PlayerView) => void;
   setTimerExpiresAt: (ts: number | null) => void;
-  cacheCards: (cards: CardListItemDto[]) => void;
+  // keys are MongoDB ObjectId strings (matching pack/pick state IDs)
+  cacheCards: (cards: Record<string, CardListItemDto>) => void;
   reset: () => void;
 }
 
@@ -96,7 +97,7 @@ export const useDraftStore = create<DraftStoreState>((set) => ({
   cacheCards: (cards) =>
     set((s) => {
       const next = new Map(s.cardCache);
-      for (const c of cards) next.set(c.scryfallId, c);
+      for (const [id, card] of Object.entries(cards)) next.set(id, card);
       return { cardCache: next };
     }),
 
