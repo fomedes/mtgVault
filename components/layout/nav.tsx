@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -10,11 +11,18 @@ const LINKS = [
   { href: "/draft", label: "Draft" },
   { href: "/shop", label: "Shop" },
   { href: "/collection", label: "Collection" },
+  { href: "/decks", label: "Decks" },
   { href: "/history", label: "History" },
   { href: "/cards", label: "Browse" },
 ];
 
-export function Nav({ role }: { role: string }) {
+export function Nav({
+  role,
+  unreadNotifications = 0,
+}: {
+  role: string;
+  unreadNotifications?: number;
+}) {
   const pathname = usePathname();
 
   const isActive = (href: string) =>
@@ -27,7 +35,7 @@ export function Nav({ role }: { role: string }) {
       <nav className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
         <Link
           href="/dashboard"
-          className="text-sm font-bold tracking-tight shrink-0 mr-2"
+          className="mr-2 shrink-0 text-sm font-bold tracking-tight"
         >
           MTG Vault
         </Link>
@@ -62,6 +70,7 @@ export function Nav({ role }: { role: string }) {
           ) : null}
         </div>
 
+        <NotificationBell unreadCount={unreadNotifications} />
         <SignOutButton />
       </nav>
     </header>

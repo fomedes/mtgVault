@@ -132,6 +132,8 @@ function groupDominantColor(colors: string[]): string {
   return colors[0];
 }
 
+const PAGE_SIZE = 120;
+
 export function CollectionBrowser() {
   const [entries, setEntries] = useState<CollectionEntryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,9 +142,27 @@ export function CollectionBrowser() {
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { staggerContainer } = useCollectionAnimations();
 
   const hasFetchedRef = useRef(false);
+  const endSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Intersection observer to load more items as user scrolls
+  useEffect(() => {
+    const sentinel = endSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((prev) => prev + PAGE_SIZE);
+        }
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  });
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
@@ -230,7 +250,7 @@ export function CollectionBrowser() {
               <button
                 key={g}
                 type="button"
-                onClick={() => setGroupBy(g)}
+                onClick={() => { setGroupBy(g); setVisibleCount(PAGE_SIZE); }}
                 className={groupTabClass(groupBy === g)}
               >
                 {g === "none" ? "All" : g === "set" ? "By Set" : "By Color"}
@@ -241,7 +261,10 @@ export function CollectionBrowser() {
         </div>
       </header>
 
-      <CardFilterBar filters={filters} onChange={setFilters} />
+      <CardFilterBar
+        filters={filters}
+        onChange={(f) => { setFilters(f); setVisibleCount(PAGE_SIZE); }}
+      />
 
       {error ? (
         <div className="py-16 text-center">
@@ -265,31 +288,48 @@ export function CollectionBrowser() {
         </p>
       ) : (
         <div className="space-y-8">
-          {groups.map(({ label, entries: groupEntries }) => (
-            <section key={label || "all"}>
-              {label ? (
-                <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-widest">
-                  {label}
-                </h2>
-              ) : null}
-              <motion.div
-                variants={isFirstLoad ? staggerContainer : undefined}
-                initial={isFirstLoad ? "hidden" : false}
-                animate={isFirstLoad ? "visible" : undefined}
-              >
-                <CardGrid>
-                  {groupEntries.map((entry) => (
-                    <CollectionTile
-                      key={entry.cardId}
-                      entry={entry}
-                      animate={isFirstLoad}
-                      onClick={() => setSelectedId(entry.card.scryfallId)}
-                    />
-                  ))}
-                </CardGrid>
-              </motion.div>
-            </section>
-          ))}
+          {(() => {
+            let remaining = visibleCount;
+            return groups.map(({ label, entries: groupEntries }) => {
+              if (remaining <= 0) return null;
+              const visible = groupEntries.slice(0, remaining);
+              remaining -= visible.length;
+              return (
+                <section key={label || "all"}>
+                  {label ? (
+                    <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-widest">
+                      {label}
+                    </h2>
+                  ) : null}
+                  <motion.div
+                    variants={isFirstLoad ? staggerContainer : undefined}
+                    initial={isFirstLoad ? "hidden" : false}
+                    animate={isFirstLoad ? "visible" : undefined}
+                  >
+                    <CardGrid>
+                      {visible.map((entry) => (
+                        <CollectionTile
+                          key={entry.cardId}
+                          entry={entry}
+                          animate={isFirstLoad}
+                          onClick={() => setSelectedId(entry.card.scryfallId)}
+                        />
+                      ))}
+                    </CardGrid>
+                  </motion.div>
+                </section>
+              );
+            });
+          })()}
+          {visibleCount < filtered.length ? (
+            <div ref={endSentinelRef} className="flex justify-center py-4">
+              <p className="text-muted-foreground text-sm">
+                Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} cards
+              </p>
+            </div>
+          ) : (
+            <div ref={endSentinelRef} aria-hidden className="h-px" />
+          )}
         </div>
       )}
 

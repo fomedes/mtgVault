@@ -4,6 +4,8 @@ import { CardBrowser } from "@/components/cards/card-browser";
 import { connectToDatabase } from "@/lib/db";
 import { CardSet } from "@/lib/models/CardSet";
 
+export const revalidate = 300;
+
 export default async function SetPage({
   params,
 }: {
