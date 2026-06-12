@@ -128,6 +128,14 @@
   html {
     @apply font-sans;
   }
+  button,
+  [role="button"] {
+    @apply cursor-pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    @apply cursor-not-allowed;
+  }
 }
 
 /* MTG design tokens — rarity accents and colour identity (overview §9, agent-design). */

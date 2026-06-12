@@ -61,16 +61,28 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
           shortCode = generateShortCode();
         }
 
-        const hostPlayer = { uid: user.uid, displayName: user.displayName ?? user.email };
-        const draftState = createDraft(
+        // Build a minimal lobby state WITHOUT calling createDraft — that
+        // function requires ≥2 players and pre-generated packs, neither of
+        // which exist yet.  createDraft is called only when lobby:start fires.
+        const lobbyState: import("@/lib/game/draft").DraftState = {
           sessionId,
-          setCode.toLowerCase(),
-          [hostPlayer],
-          [], // packs generated at start-time
-          clampedTimer,
-        );
-        // Override status to lobby — start hasn't happened yet.
-        const lobbyState = { ...draftState, status: "lobby" as const };
+          setCode: setCode.toLowerCase(),
+          format: "booster",
+          timerMs: clampedTimer,
+          status: "lobby",
+          players: [{
+            uid: user.uid,
+            displayName: user.displayName ?? user.email,
+            seatIndex: 0,
+            isConnected: false,
+          }],
+          allPacks: [[[]]],     // placeholder — replaced on start
+          currentPacks: [[]],
+          picks: [[]],
+          pickedThisSlot: [false],
+          round: 0,
+          pickInRound: 0,
+        };
 
         await DraftSession.create({
           sessionId,

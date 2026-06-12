@@ -12,6 +12,28 @@ const TIMER_OPTIONS = [
   { label: "90 s", value: 90_000 },
 ];
 
+const SOCKET_TIMEOUT_MS = 8_000;
+
+/** Wraps socket.emit with a timeout so the button never gets stuck if the
+ *  server is unreachable or the socket is not yet connected. */
+function emitWithTimeout<T>(
+  socket: ReturnType<typeof useSocketConnection>,
+  event: string,
+  payload: unknown,
+  timeoutMs: number,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("socket_timeout")),
+      timeoutMs,
+    );
+    socket.emit(event, payload, (res: T) => {
+      clearTimeout(timer);
+      resolve(res);
+    });
+  });
+}
+
 export function LobbyView({
   myUid,
   availableSets,
@@ -20,7 +42,9 @@ export function LobbyView({
   availableSets: { code: string; name: string }[];
 }) {
   const socket = useSocketConnection();
-  const { sessionId, shortCode, lobbyPlayers, hostUid, status } = useDraftStore();
+  const socketConnected = useDraftStore((s) => s.socketConnected);
+  const { sessionId, shortCode, lobbyPlayers, hostUid, status } =
+    useDraftStore();
 
   const [mode, setMode] = useState<"pick" | "create" | "join">("pick");
   const [setCode, setSetCode] = useState(availableSets[0]?.code ?? "");
@@ -34,37 +58,59 @@ export function LobbyView({
   const canStart = isHost && lobbyPlayers.length >= 2;
 
   async function handleCreate() {
+    if (!socketConnected) {
+      setError("Not connected to the draft server. Make sure pnpm dev:socket is running and NEXT_PUBLIC_SOCKET_URL is set.");
+      return;
+    }
     setBusy(true);
     setError(null);
-    socket.emit(
-      "lobby:create",
-      { setCode, timerMs },
-      (res: { ok: boolean; error?: string }) => {
-        setBusy(false);
-        if (!res.ok) setError(res.error ?? "Failed to create lobby");
-      },
-    );
+    try {
+      const res = await emitWithTimeout<{ ok: boolean; error?: string }>(
+        socket,
+        "lobby:create",
+        { setCode, timerMs },
+        SOCKET_TIMEOUT_MS,
+      );
+      if (!res.ok) setError(res.error ?? "Failed to create lobby");
+    } catch {
+      setError("Could not reach the draft server. Is it running?");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleJoin() {
     if (!joinCode.trim()) return;
+    if (!socketConnected) {
+      setError("Not connected to the draft server.");
+      return;
+    }
     setBusy(true);
     setError(null);
-    socket.emit(
-      "lobby:join",
-      { shortCode: joinCode.trim().toUpperCase() },
-      (res: { ok: boolean; error?: string }) => {
-        setBusy(false);
-        if (!res.ok) setError(res.error ?? "Lobby not found");
-      },
-    );
+    try {
+      const res = await emitWithTimeout<{ ok: boolean; error?: string }>(
+        socket,
+        "lobby:join",
+        { shortCode: joinCode.trim().toUpperCase() },
+        SOCKET_TIMEOUT_MS,
+      );
+      if (!res.ok) setError(res.error ?? "Lobby not found");
+    } catch {
+      setError("Could not reach the draft server. Is it running?");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function handleStart() {
     if (!sessionId) return;
-    socket.emit("lobby:start", { sessionId }, (res: { ok: boolean; error?: string }) => {
-      if (!res.ok) setError(res.error ?? "Could not start draft");
-    });
+    socket.emit(
+      "lobby:start",
+      { sessionId },
+      (res: { ok: boolean; error?: string }) => {
+        if (!res.ok) setError(res.error ?? "Could not start draft");
+      },
+    );
   }
 
   function handleLeave() {
@@ -74,10 +120,23 @@ export function LobbyView({
     setMode("pick");
   }
 
+  // ── Connection status banner ──────────────────────────────────────────────
+
+  const connectionBanner = !socketConnected ? (
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400">
+      Connecting to draft server…{" "}
+      <span className="text-muted-foreground text-xs">
+        (run <code className="font-mono">pnpm dev:socket</code> locally)
+      </span>
+    </div>
+  ) : null;
+
   // ── In lobby ──────────────────────────────────────────────────────────────
   if (amInLobby) {
     return (
       <div className="space-y-6">
+        {connectionBanner}
+
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">Lobby</h2>
@@ -133,13 +192,16 @@ export function LobbyView({
   // ── Pre-lobby: pick mode ──────────────────────────────────────────────────
   if (mode === "pick") {
     return (
-      <div className="flex flex-col gap-4 items-center py-8">
-        <h2 className="text-lg font-semibold">Ready to draft?</h2>
-        <div className="flex gap-3">
-          <Button onClick={() => setMode("create")}>Create lobby</Button>
-          <Button variant="outline" onClick={() => setMode("join")}>
-            Join lobby
-          </Button>
+      <div className="flex flex-col gap-6">
+        {connectionBanner}
+        <div className="flex flex-col gap-4 items-center py-8">
+          <h2 className="text-lg font-semibold">Ready to draft?</h2>
+          <div className="flex gap-3">
+            <Button onClick={() => setMode("create")}>Create lobby</Button>
+            <Button variant="outline" onClick={() => setMode("join")}>
+              Join lobby
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -150,6 +212,8 @@ export function LobbyView({
     return (
       <div className="space-y-4 max-w-sm">
         <h2 className="text-lg font-semibold">Create lobby</h2>
+
+        {connectionBanner}
 
         <div className="space-y-1">
           <label className="text-sm font-medium" htmlFor="setCode">Set</label>
@@ -191,10 +255,16 @@ export function LobbyView({
         {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
         <div className="flex gap-2">
-          <Button onClick={handleCreate} disabled={busy || !setCode}>
+          <Button onClick={handleCreate} disabled={busy || !setCode || !socketConnected}>
             {busy ? "Creating…" : "Create"}
           </Button>
-          <Button variant="ghost" onClick={() => { setMode("pick"); setError(null); }}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMode("pick");
+              setError(null);
+            }}
+          >
             Cancel
           </Button>
         </div>
@@ -206,6 +276,9 @@ export function LobbyView({
   return (
     <div className="space-y-4 max-w-sm">
       <h2 className="text-lg font-semibold">Join lobby</h2>
+
+      {connectionBanner}
+
       <div className="space-y-1">
         <label className="text-sm font-medium" htmlFor="code">Lobby code</label>
         <input
@@ -222,10 +295,19 @@ export function LobbyView({
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
       <div className="flex gap-2">
-        <Button onClick={handleJoin} disabled={busy || joinCode.length !== 6}>
+        <Button
+          onClick={handleJoin}
+          disabled={busy || joinCode.length !== 6 || !socketConnected}
+        >
           {busy ? "Joining…" : "Join"}
         </Button>
-        <Button variant="ghost" onClick={() => { setMode("pick"); setError(null); }}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setMode("pick");
+            setError(null);
+          }}
+        >
           Cancel
         </Button>
       </div>
