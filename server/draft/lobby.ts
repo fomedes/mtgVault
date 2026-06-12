@@ -47,7 +47,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
         await connectToDatabase();
         const { setCode, timerMs } = payload;
         const clampedTimer = Math.min(90_000, Math.max(30_000, timerMs ?? 60_000));
-        const numPacks = Math.min(3, Math.max(1, payload.numPacks ?? 3));
+        const numPacks = Math.min(5, Math.max(1, payload.numPacks ?? 3));
 
         const cardSet = await CardSet.findOne(
           { code: setCode.toLowerCase(), enabled: true, cardsSyncedAt: { $exists: true } },

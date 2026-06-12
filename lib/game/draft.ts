@@ -5,9 +5,9 @@
  *
  * Booster draft rules:
  *  - 2–8 players seated in a circle.
- *  - numPacks rounds × 15 cards = numPacks×15 picks per player.
- *  - Rounds 1 & 3 (odd indices): pass LEFT  (seat i → seat (i+1) % N).
- *  - Round  2    (index 1)     : pass RIGHT (seat i → seat (i-1+N) % N).
+ *  - numPacks rounds × 15 cards = numPacks×15 picks per player (1–5 rounds).
+ *  - Even-indexed rounds (0, 2, 4): pass LEFT  (seat i → seat (i+1) % N).
+ *  - Odd-indexed rounds  (1, 3)   : pass RIGHT (seat i → seat (i-1+N) % N).
  *  - All players pick simultaneously; packs rotate after every player picks.
  *  - Auto-pick: if a player's timer expires, pick the first card in their pack.
  */
@@ -27,7 +27,7 @@ export interface DraftState {
   format: "booster";
   timerMs: number;
 
-  /** Number of booster rounds per player (1–3). Default 3. */
+  /** Number of booster rounds per player (1–5). Default 3. */
   numPacks: number;
 
   players: DraftPlayer[];
@@ -75,9 +75,9 @@ export interface PlayerView {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Pass direction: +1 = left (even rounds), −1 = right (round 1). */
+/** Pass direction: +1 = left (even rounds 0,2,4), −1 = right (odd rounds 1,3). */
 function passDir(round: number): 1 | -1 {
-  return round === 1 ? -1 : 1;
+  return round % 2 === 0 ? 1 : -1;
 }
 
 function wrap(i: number, n: number): number {
@@ -98,7 +98,7 @@ export function createDraft(
 ): DraftState {
   const n = players.length;
   if (n < 2 || n > 8) throw new Error("draft requires 2–8 players");
-  if (numPacks < 1 || numPacks > 3) throw new Error("numPacks must be 1–3");
+  if (numPacks < 1 || numPacks > 5) throw new Error("numPacks must be 1–5");
   if (allPacks.length !== n || allPacks.some((p) => p.length !== numPacks))
     throw new Error(`allPacks must be [N][${numPacks}][${PACK_SIZE}]`);
 

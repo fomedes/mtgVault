@@ -23,6 +23,8 @@ const PACK_OPTIONS = [
   { value: 1, label: "1 pack (15 picks)" },
   { value: 2, label: "2 packs (30 picks)" },
   { value: 3, label: "3 packs (45 picks)" },
+  { value: 4, label: "4 packs (60 picks)" },
+  { value: 5, label: "5 packs (75 picks)" },
 ] as const;
 
 type Difficulty = "easy" | "medium" | "hard";

@@ -16,6 +16,8 @@ const PACK_OPTIONS = [
   { label: "1 pack (15 picks)", value: 1 },
   { label: "2 packs (30 picks)", value: 2 },
   { label: "3 packs (45 picks)", value: 3 },
+  { label: "4 packs (60 picks)", value: 4 },
+  { label: "5 packs (75 picks)", value: 5 },
 ];
 
 const SOCKET_TIMEOUT_MS = 8_000;

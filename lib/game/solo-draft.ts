@@ -107,7 +107,7 @@ export async function createSoloDraft(
 ): Promise<SoloDraftView> {
   await connectToDatabase();
 
-  const clampedNumPacks = Math.min(3, Math.max(1, numPacks));
+  const clampedNumPacks = Math.min(5, Math.max(1, numPacks));
 
   const players = [
     { uid: userId, displayName: "You" },

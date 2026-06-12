@@ -6,7 +6,7 @@ import { createSoloDraft, listSoloDrafts } from "@/lib/game/solo-draft";
 const CreateSchema = z.object({
   setCode: z.string().min(2).max(10),
   difficulty: z.enum(["easy", "medium", "hard"]),
-  numPacks: z.number().int().min(1).max(3).default(3),
+  numPacks: z.number().int().min(1).max(5).default(3),
 });
 
 export async function GET() {
