@@ -13,9 +13,9 @@ const TIMER_OPTIONS = [
 ];
 
 const PACK_OPTIONS = [
-  { label: "1 pack", value: 1 },
-  { label: "2 packs", value: 2 },
-  { label: "3 packs", value: 3 },
+  { label: "1 pack (15 picks)", value: 1 },
+  { label: "2 packs (30 picks)", value: 2 },
+  { label: "3 packs (45 picks)", value: 3 },
 ];
 
 const SOCKET_TIMEOUT_MS = 8_000;
@@ -260,24 +260,19 @@ export function LobbyView({
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">Boosters per player</label>
-          <div className="flex gap-2">
+          <label className="text-sm font-medium" htmlFor="numPacks">Boosters per player</label>
+          <select
+            id="numPacks"
+            value={numPacks}
+            onChange={(e) => setNumPacks(Number(e.target.value))}
+            className="border-input bg-background h-9 w-full rounded-lg border px-2 text-sm"
+          >
             {PACK_OPTIONS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() => setNumPacks(p.value)}
-                className={cn(
-                  "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                  numPacks === p.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted",
-                )}
-              >
+              <option key={p.value} value={p.value}>
                 {p.label}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         {error ? <p className="text-destructive text-sm">{error}</p> : null}
