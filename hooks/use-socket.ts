@@ -29,6 +29,10 @@ export function useSocketConnection(): Socket {
     async function connect() {
       if (socket.connected) return;
       const auth = getFirebaseAuth();
+      // authStateReady() waits until Firebase has restored the session from
+      // IndexedDB. Without this, currentUser is null at mount time even when
+      // the user IS logged in, so the socket never connects.
+      await auth.authStateReady();
       const user = auth.currentUser;
       if (!user) return;
       const token = await user.getIdToken();
