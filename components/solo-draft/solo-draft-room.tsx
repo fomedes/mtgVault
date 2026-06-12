@@ -73,7 +73,7 @@ export function SoloDraftRoom({ initial }: Props) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium">
-              Round {session.round + 1} · Pick {session.pickInRound + 1} of 15
+              Round {session.round + 1} of {session.numPacks} · Pick {session.pickInRound + 1} of 15
             </p>
             <p className="text-muted-foreground text-xs">
               {session.currentPack.length} cards in pack ·{" "}

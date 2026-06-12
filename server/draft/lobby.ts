@@ -40,13 +40,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
   socket.on(
     "lobby:create",
     async (
-      payload: { setCode: string; timerMs: number },
+      payload: { setCode: string; timerMs: number; numPacks?: number },
       ack: (res: { ok: boolean; sessionId?: string; shortCode?: string; error?: string }) => void,
     ) => {
       try {
         await connectToDatabase();
         const { setCode, timerMs } = payload;
         const clampedTimer = Math.min(90_000, Math.max(30_000, timerMs ?? 60_000));
+        const numPacks = Math.min(3, Math.max(1, payload.numPacks ?? 3));
 
         const cardSet = await CardSet.findOne(
           { code: setCode.toLowerCase(), enabled: true, cardsSyncedAt: { $exists: true } },
@@ -69,6 +70,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
           setCode: setCode.toLowerCase(),
           format: "booster",
           timerMs: clampedTimer,
+          numPacks,
           status: "lobby",
           players: [{
             uid: user.uid,
@@ -208,14 +210,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
         if (user.uid !== activeSession.state.players[0]?.uid) return ack({ ok: false, error: "not_host" });
         if (activeSession.state.players.length < 2) return ack({ ok: false, error: "need_2_players" });
 
-        const { sessionId, setCode, timerMs, players } = activeSession.state;
+        const { sessionId, setCode, timerMs, numPacks = 3, players } = activeSession.state;
         const n = players.length;
 
-        // Generate packs for every player × 3 rounds.
+        // Generate packs for every player × numPacks rounds.
         const allPacks: string[][][] = [];
         for (let i = 0; i < n; i++) {
           const roundPacks: string[][] = [];
-          for (let r = 0; r < 3; r++) {
+          for (let r = 0; r < numPacks; r++) {
             const { cardIds } = await generateBooster(setCode);
             roundPacks.push(cardIds.map((id) => id.toString()));
           }
@@ -228,6 +230,7 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
           players.map((p) => ({ uid: p.uid, displayName: p.displayName })),
           allPacks,
           timerMs,
+          numPacks,
         );
         // Mark all players who are currently socketed as connected.
         for (const p of draftState.players) {

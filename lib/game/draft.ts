@@ -5,9 +5,9 @@
  *
  * Booster draft rules:
  *  - 2–8 players seated in a circle.
- *  - 3 rounds × 15 cards = 45 picks per player.
- *  - Rounds 1 & 3: pass LEFT  (seat i → seat (i+1) % N).
- *  - Round  2    : pass RIGHT (seat i → seat (i-1+N) % N).
+ *  - numPacks rounds × 15 cards = numPacks×15 picks per player.
+ *  - Rounds 1 & 3 (odd indices): pass LEFT  (seat i → seat (i+1) % N).
+ *  - Round  2    (index 1)     : pass RIGHT (seat i → seat (i-1+N) % N).
  *  - All players pick simultaneously; packs rotate after every player picks.
  *  - Auto-pick: if a player's timer expires, pick the first card in their pack.
  */
@@ -27,6 +27,9 @@ export interface DraftState {
   format: "booster";
   timerMs: number;
 
+  /** Number of booster rounds per player (1–3). Default 3. */
+  numPacks: number;
+
   players: DraftPlayer[];
 
   /** allPacks[seatIndex][round] = original 15 card-id strings for that seat/round. */
@@ -41,7 +44,7 @@ export interface DraftState {
   /** Whether seat i has already picked in the current slot. */
   pickedThisSlot: boolean[];
 
-  /** 0-indexed round (0, 1, 2). */
+  /** 0-indexed round (0 … numPacks-1). */
   round: number;
 
   /** 0-indexed pick within the current round (0..14). */
@@ -57,6 +60,7 @@ export interface PlayerView {
   picks: string[];
   round: number;
   pickInRound: number;
+  numPacks: number;
   status: DraftStatus;
   needsPick: boolean;
   players: Array<{
@@ -71,7 +75,7 @@ export interface PlayerView {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Pass direction: +1 = left (rounds 0,2), −1 = right (round 1). */
+/** Pass direction: +1 = left (even rounds), −1 = right (round 1). */
 function passDir(round: number): 1 | -1 {
   return round === 1 ? -1 : 1;
 }
@@ -79,6 +83,8 @@ function passDir(round: number): 1 | -1 {
 function wrap(i: number, n: number): number {
   return ((i % n) + n) % n;
 }
+
+const PACK_SIZE = 15;
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
@@ -88,17 +94,20 @@ export function createDraft(
   players: { uid: string; displayName: string }[],
   allPacks: string[][][],
   timerMs: number,
+  numPacks = 3,
 ): DraftState {
   const n = players.length;
   if (n < 2 || n > 8) throw new Error("draft requires 2–8 players");
-  if (allPacks.length !== n || allPacks.some((p) => p.length !== 3))
-    throw new Error("allPacks must be [N][3][15]");
+  if (numPacks < 1 || numPacks > 3) throw new Error("numPacks must be 1–3");
+  if (allPacks.length !== n || allPacks.some((p) => p.length !== numPacks))
+    throw new Error(`allPacks must be [N][${numPacks}][${PACK_SIZE}]`);
 
   return {
     sessionId,
     setCode,
     format: "booster",
     timerMs,
+    numPacks,
     players: players.map((p, i) => ({
       uid: p.uid,
       displayName: p.displayName,
@@ -185,6 +194,7 @@ export function getPlayerView(
     picks: [...state.picks[seatIndex]],
     round: state.round,
     pickInRound: state.pickInRound,
+    numPacks: state.numPacks ?? 3,
     status: state.status,
     needsPick: !state.pickedThisSlot[seatIndex],
     players: state.players.map((p) => ({
@@ -212,12 +222,13 @@ function _advanceSlot(state: DraftState): DraftState {
   const n = state.players.length;
   const newPickInRound = state.pickInRound + 1;
   const newPickedThisSlot = Array.from({ length: n }, () => false);
+  const numPacks = state.numPacks ?? 3;
 
-  if (newPickInRound === 15) {
+  if (newPickInRound === PACK_SIZE) {
     // Round complete.
     const newRound = state.round + 1;
-    if (newRound === 3) {
-      return { ...state, pickInRound: 15, pickedThisSlot: newPickedThisSlot, status: "complete" };
+    if (newRound === numPacks) {
+      return { ...state, pickInRound: PACK_SIZE, pickedThisSlot: newPickedThisSlot, status: "complete" };
     }
     // Open the next round's fresh packs.
     const freshPacks = state.allPacks.map((playerPacks) => [...playerPacks[newRound]]);

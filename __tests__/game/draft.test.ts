@@ -27,14 +27,14 @@ function fakePack(seat: number, round: number): string[] {
   return Array.from({ length: 15 }, (_, k) => `card-s${seat}-r${round}-${k}`);
 }
 
-function makeAllPacks(n: number): string[][][] {
+function makeAllPacks(n: number, numPacks = 3): string[][][] {
   return Array.from({ length: n }, (_, s) =>
-    Array.from({ length: 3 }, (_, r) => fakePack(s, r)),
+    Array.from({ length: numPacks }, (_, r) => fakePack(s, r)),
   );
 }
 
 function fullDraft2P() {
-  return createDraft("s1", "tst", PLAYERS_2, makeAllPacks(2), 60_000);
+  return createDraft("s1", "tst", PLAYERS_2, makeAllPacks(2), 60_000, 3);
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ describe("full 2-player draft completes after 45 picks each", () => {
 
 describe("full 4-player draft", () => {
   it("completes correctly", () => {
-    let s = createDraft("s4", "tst", PLAYERS_4, makeAllPacks(4), 60_000);
+    let s = createDraft("s4", "tst", PLAYERS_4, makeAllPacks(4), 60_000, 3);
     for (let pick = 0; pick < 45; pick++) {
       for (let seat = 0; seat < 4; seat++) {
         if (!s.pickedThisSlot[seat]) {

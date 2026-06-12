@@ -79,6 +79,7 @@ export interface SoloDraftView {
   sessionId: string;
   setCode: string;
   difficulty: BotDifficulty;
+  numPacks: number;
   status: "drafting" | "complete";
   currentPack: string[];
   picks: string[];
@@ -102,8 +103,11 @@ export async function createSoloDraft(
   userId: string,
   setCode: string,
   difficulty: BotDifficulty,
+  numPacks = 3,
 ): Promise<SoloDraftView> {
   await connectToDatabase();
+
+  const clampedNumPacks = Math.min(3, Math.max(1, numPacks));
 
   const players = [
     { uid: userId, displayName: "You" },
@@ -113,11 +117,11 @@ export async function createSoloDraft(
     })),
   ];
 
-  // Generate 8 × 3 boosters (one per seat per round).
+  // Generate 8 × numPacks boosters (one per seat per round).
   const allPacks: string[][][] = [];
   for (let seat = 0; seat < 8; seat++) {
     const seatPacks: string[][] = [];
-    for (let round = 0; round < 3; round++) {
+    for (let round = 0; round < clampedNumPacks; round++) {
       const booster = await generateBooster(setCode);
       seatPacks.push(booster.cardIds.map(String));
     }
@@ -125,7 +129,7 @@ export async function createSoloDraft(
   }
 
   const sessionId = `solo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  const state = createDraft(sessionId, setCode, players, allPacks, 60_000);
+  const state = createDraft(sessionId, setCode, players, allPacks, 60_000, clampedNumPacks);
 
   const doc = await SoloDraftSession.create({
     userId,
@@ -185,6 +189,9 @@ export async function humanPick(
 
   const complete = isComplete(state);
   doc.draftState = state;
+  // Mongoose Mixed fields require markModified to ensure the change is
+  // detected and persisted — a plain assignment is not always tracked.
+  doc.markModified("draftState");
   doc.status = complete ? "complete" : "drafting";
   if (complete) {
     doc.picks = state.picks[HUMAN_SEAT];
@@ -235,6 +242,7 @@ function toSoloDraftView(
     sessionId,
     setCode,
     difficulty,
+    numPacks: view.numPacks,
     status,
     currentPack: view.currentPack,
     picks: view.picks,

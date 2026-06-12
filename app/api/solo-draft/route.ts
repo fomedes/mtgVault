@@ -6,6 +6,7 @@ import { createSoloDraft, listSoloDrafts } from "@/lib/game/solo-draft";
 const CreateSchema = z.object({
   setCode: z.string().min(2).max(10),
   difficulty: z.enum(["easy", "medium", "hard"]),
+  numPacks: z.number().int().min(1).max(3).default(3),
 });
 
 export async function GET() {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const view = await createSoloDraft(guard.user.uid, parsed.data.setCode, parsed.data.difficulty);
+    const view = await createSoloDraft(guard.user.uid, parsed.data.setCode, parsed.data.difficulty, parsed.data.numPacks);
     return NextResponse.json({ session: view }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "failed";

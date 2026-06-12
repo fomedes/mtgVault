@@ -12,6 +12,12 @@ const TIMER_OPTIONS = [
   { label: "90 s", value: 90_000 },
 ];
 
+const PACK_OPTIONS = [
+  { label: "1 pack", value: 1 },
+  { label: "2 packs", value: 2 },
+  { label: "3 packs", value: 3 },
+];
+
 const SOCKET_TIMEOUT_MS = 8_000;
 
 /** Wraps socket.emit with a timeout so the button never gets stuck if the
@@ -49,6 +55,7 @@ export function LobbyView({
   const [mode, setMode] = useState<"pick" | "create" | "join">("pick");
   const [setCode, setSetCode] = useState(availableSets[0]?.code ?? "");
   const [timerMs, setTimerMs] = useState(60_000);
+  const [numPacks, setNumPacks] = useState(3);
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +75,7 @@ export function LobbyView({
       const res = await emitWithTimeout<{ ok: boolean; error?: string }>(
         socket,
         "lobby:create",
-        { setCode, timerMs },
+        { setCode, timerMs, numPacks },
         SOCKET_TIMEOUT_MS,
       );
       if (!res.ok) setError(res.error ?? "Failed to create lobby");
@@ -247,6 +254,27 @@ export function LobbyView({
                 )}
               >
                 {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Boosters per player</label>
+          <div className="flex gap-2">
+            {PACK_OPTIONS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setNumPacks(p.value)}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                  numPacks === p.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {p.label}
               </button>
             ))}
           </div>

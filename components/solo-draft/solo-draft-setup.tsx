@@ -19,12 +19,19 @@ const DIFFICULTY_OPTIONS = [
   { value: "hard", label: "Hard — bots optimise rarity, curve, and colour" },
 ] as const;
 
+const PACK_OPTIONS = [
+  { value: 1, label: "1 pack (15 picks)" },
+  { value: 2, label: "2 packs (30 picks)" },
+  { value: 3, label: "3 packs (45 picks)" },
+] as const;
+
 type Difficulty = "easy" | "medium" | "hard";
 
 export function SoloDraftSetup({ availableSets }: Props) {
   const router = useRouter();
   const [setCode, setSetCode] = useState(availableSets[0]?.code ?? "");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [numPacks, setNumPacks] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +44,7 @@ export function SoloDraftSetup({ availableSets }: Props) {
       const res = await fetch("/api/solo-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setCode, difficulty }),
+        body: JSON.stringify({ setCode, difficulty, numPacks }),
       });
 
       if (!res.ok) {
@@ -97,6 +104,24 @@ export function SoloDraftSetup({ availableSets }: Props) {
           {DIFFICULTY_OPTIONS.map((d) => (
             <option key={d.value} value={d.value}>
               {d.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium" htmlFor="numPacks">
+          Boosters per player
+        </label>
+        <select
+          id="numPacks"
+          value={numPacks}
+          onChange={(e) => setNumPacks(Number(e.target.value))}
+          className={selectClass}
+        >
+          {PACK_OPTIONS.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
             </option>
           ))}
         </select>
