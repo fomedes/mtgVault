@@ -1,20 +1,25 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CardGrid } from "@/components/cards/card-grid";
 import { CardTile } from "@/components/cards/card-tile";
+import { Button } from "@/components/ui/button";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 
 interface DeckDetail {
   sessionId: string;
   setCode: string;
   cards: CardListItemDto[];
+  cardIds: string[];
   createdAt: string;
 }
 
 export function SavedDeckView({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
   const [deck, setDeck] = useState<DeckDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [building, setBuilding] = useState(false);
 
   useEffect(() => {
     fetch(`/api/history/${sessionId}`)
@@ -25,6 +30,26 @@ export function SavedDeckView({ sessionId }: { sessionId: string }) {
       })
       .catch(() => setIsLoading(false));
   }, [sessionId]);
+
+  async function handleBuildDeck() {
+    if (!deck) return;
+    setBuilding(true);
+    try {
+      const res = await fetch("/api/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `Draft — ${deck.setCode.toUpperCase()} (${new Date(deck.createdAt).toLocaleDateString()})`,
+          sourceDraftId: deck.sessionId,
+          cardIds: deck.cardIds,
+        }),
+      });
+      const data = (await res.json()) as { deck?: { id: string } };
+      if (data.deck?.id) router.push(`/decks/${data.deck.id}`);
+    } finally {
+      setBuilding(false);
+    }
+  }
 
   if (isLoading) {
     return <div className="bg-muted h-64 animate-pulse rounded-lg" />;
@@ -43,6 +68,14 @@ export function SavedDeckView({ sessionId }: { sessionId: string }) {
           </p>
           <p className="text-lg font-semibold">{deck.cards.length} picks</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleBuildDeck}
+          disabled={building}
+        >
+          {building ? "Creating…" : "Build Deck →"}
+        </Button>
       </div>
 
       <CardGrid>

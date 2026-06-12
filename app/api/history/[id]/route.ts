@@ -44,6 +44,7 @@ export async function GET(
     sessionId: deck.sessionId,
     setCode: deck.setCode,
     cards,
+    cardIds: deck.cardIds,
     createdAt: (deck.createdAt as Date).toISOString(),
   });
 }
