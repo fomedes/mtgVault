@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { CardImage } from "@/components/cards/card-image";
+import { useCardPreviewContext } from "@/components/cards/card-preview-provider";
 import { useCardAnimations } from "@/lib/animations/card";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function CardTile({
   owned?: boolean;
 }) {
   const { cardHover } = useCardAnimations();
+  const { previewHandlers } = useCardPreviewContext();
   const image = frontImage(card);
   const face = card.cardFaces[0];
 
@@ -42,6 +44,7 @@ export function CardTile({
       whileHover="hover"
       whileTap="tap"
       onClick={onClick}
+      {...previewHandlers(card)}
       aria-label={`${card.name}, ${card.rarity}`}
       className={cn(
         "relative cursor-pointer rounded-[4.75%/3.43%] ring-0 outline-none hover:ring-2 focus-visible:ring-2",

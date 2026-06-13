@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
 import { CardFilterBar } from "@/components/cards/card-filter-bar";
 import { CardGrid, CardGridSkeleton } from "@/components/cards/card-grid";
+import { CardPreviewProvider } from "@/components/cards/card-preview-provider";
 import { CardTile } from "@/components/cards/card-tile";
 import {
   filtersFromSearchParams,
@@ -91,6 +92,7 @@ export function CardBrowser({
   }, [loadMore]);
 
   return (
+    <CardPreviewProvider>
     <div className="flex flex-col gap-5">
       <header className="space-y-1">
         <Link
@@ -154,5 +156,6 @@ export function CardBrowser({
         onClose={() => setSelectedId(null)}
       />
     </div>
+    </CardPreviewProvider>
   );
 }

@@ -304,7 +304,7 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 9 — Shared Card UX Primitives
 
-> **Status (2026-06-13):** Not started. Foundation for Phases 10 & 11. Per-task tracking in `PHASE_PROGRESS/PHASE9_PROGRESS.md`.
+> **Status (2026-06-13):** ✅ Implemented — typecheck clean · 205 tests pass (33 new). Per-task tracking in `PHASE_PROGRESS/PHASE9_PROGRESS.md`.
 
 **Goal:** Build the two reusable pieces every later surface needs — a hover/zoom card preview and a comprehensive stats panel backed by a **pure** engine — so deck builder, draft, collection and library all consume one implementation. Implements **D15–D16**.
 

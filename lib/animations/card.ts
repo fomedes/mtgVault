@@ -40,10 +40,34 @@ const cardFlipReduced: Variants = {
   back: { rotateY: 180, transition: { duration: 0 } },
 };
 
+/** Portal zoom that scales a card preview into view (P9-06). */
+export const cardZoom: Variants = {
+  hidden: { opacity: 0, scale: 0.88, y: 6 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 380, damping: 28, mass: 0.7 },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.92,
+    y: 4,
+    transition: { duration: 0.12 },
+  },
+};
+
+export const cardZoomReduced: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0 } },
+  exit: { opacity: 0, transition: { duration: 0 } },
+};
+
 export function useCardAnimations() {
   const reduced = useReducedMotion();
   return {
     cardHover: reduced ? cardHoverReduced : cardHover,
     cardFlip: reduced ? cardFlipReduced : cardFlip,
+    cardZoom: reduced ? cardZoomReduced : cardZoom,
   };
 }
