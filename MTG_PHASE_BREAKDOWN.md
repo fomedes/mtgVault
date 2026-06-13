@@ -378,7 +378,7 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 12 — Draft History & Records
 
-> **Status (2026-06-13):** Not started. Per-task tracking in `PHASE_PROGRESS/PHASE12_PROGRESS.md`.
+> **Status (2026-06-13):** COMPLETE. typecheck clean · 276 tests pass (10 new). Per-task tracking in `PHASE_PROGRESS/PHASE12_PROGRESS.md`.
 
 **Goal:** Register **every** draft (multiplayer and phantom) and let users filter history by type. Implements the surfacing half of **D19**. (Today `/api/history` reads only `SavedDeck`, i.e. multiplayer; the `draftsPlayed` counter likewise undercounts phantom drafts.)
 

@@ -6,7 +6,7 @@ export default function HistoryPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Draft History</h1>
         <p className="text-muted-foreground text-sm">
-          Your past booster draft pick lists.
+          Your completed multiplayer and phantom draft pick lists.
         </p>
       </header>
       <HistoryList />

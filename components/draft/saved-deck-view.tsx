@@ -13,6 +13,8 @@ interface DeckDetail {
   cards: CardListItemDto[];
   cardIds: string[];
   createdAt: string;
+  kind: "multiplayer" | "phantom";
+  difficulty?: string;
 }
 
 export function SavedDeckView({ sessionId }: { sessionId: string }) {
@@ -59,14 +61,31 @@ export function SavedDeckView({ sessionId }: { sessionId: string }) {
     return <p className="text-muted-foreground text-sm">Draft not found.</p>;
   }
 
+  const isPhantom = deck.kind === "phantom";
+  const difficultyLabel = deck.difficulty
+    ? deck.difficulty.charAt(0).toUpperCase() + deck.difficulty.slice(1)
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-muted-foreground text-sm uppercase tracking-wide">
-            {deck.setCode} · {new Date(deck.createdAt).toLocaleDateString()}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground text-sm uppercase tracking-wide">
+              {deck.setCode} · {new Date(deck.createdAt).toLocaleDateString()}
+            </p>
+            {isPhantom && (
+              <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-violet-500/15 text-violet-400 border border-violet-500/30">
+                Phantom
+              </span>
+            )}
+          </div>
           <p className="text-lg font-semibold">{deck.cards.length} picks</p>
+          {isPhantom && difficultyLabel && (
+            <p className="text-muted-foreground text-xs">
+              Solo draft · {difficultyLabel} bots
+            </p>
+          )}
         </div>
         <Button
           variant="outline"

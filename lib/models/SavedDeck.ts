@@ -20,6 +20,7 @@ const savedDeckSchema = new Schema(
 );
 
 savedDeckSchema.index({ userId: 1, createdAt: -1 });
+savedDeckSchema.index({ userId: 1, kind: 1, createdAt: -1 });
 savedDeckSchema.index({ sessionId: 1 });
 
 export type SavedDeckDoc = InferSchemaType<typeof savedDeckSchema>;

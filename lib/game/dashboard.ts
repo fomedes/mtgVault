@@ -134,8 +134,8 @@ export async function getDashboardData(
       .limit(5)
       .lean(),
     CardSet.find({ enabled: true }, { code: 1, name: 1, boosterPrice: 1 }).lean(),
-    SavedDeck.countDocuments({ userId }),
-    SoloDraftSession.countDocuments({ userId, status: "complete" }),
+    SavedDeck.countDocuments({ userId, kind: "multiplayer" }),
+    SavedDeck.countDocuments({ userId, kind: "phantom" }),
     Deck.find({ userId }, { name: 1, cards: 1, updatedAt: 1 })
       .sort({ updatedAt: -1 })
       .limit(5)

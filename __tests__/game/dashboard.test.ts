@@ -47,18 +47,15 @@ beforeEach(async () => {
 describe("getDashboardData — draft counts split (D19)", () => {
   it("counts multiplayer and phantom drafts separately", async () => {
     await SavedDeck.create([
-      { userId: UID, sessionId: "s1", setCode: "dom", cardIds: ["a", "b"] },
-      { userId: UID, sessionId: "s2", setCode: "neo", cardIds: ["c"] },
-    ]);
-    await SoloDraftSession.create([
-      { userId: UID, setCode: "dom", difficulty: "easy", status: "complete", draftState: {} },
-      { userId: UID, setCode: "neo", difficulty: "hard", status: "drafting", draftState: {} },
+      { userId: UID, sessionId: "s1", setCode: "dom", cardIds: ["a", "b"], kind: "multiplayer" },
+      { userId: UID, sessionId: "s2", setCode: "neo", cardIds: ["c"], kind: "multiplayer" },
+      { userId: UID, sessionId: "solo-1", setCode: "dom", cardIds: ["d"], kind: "phantom", difficulty: "easy" },
     ]);
 
     const data = await getDashboardData(UID, 100);
 
     expect(data.stats.draftsMultiplayer).toBe(2);
-    expect(data.stats.draftsPhantom).toBe(1); // only the completed solo draft
+    expect(data.stats.draftsPhantom).toBe(1);
   });
 
   it("surfaces in-progress phantom drafts and recent decks as widgets", async () => {
