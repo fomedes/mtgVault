@@ -3,8 +3,10 @@ import type { Server, Socket } from "socket.io";
 import { connectToDatabase } from "@/lib/db";
 import { DraftSession } from "@/lib/models/DraftSession";
 import { CardSet } from "@/lib/models/CardSet";
+import { Friendship, canonicalPair } from "@/lib/models/Friendship";
 import { generateBooster } from "@/lib/game/booster";
 import { createDraft } from "@/lib/game/draft";
+import { sendDraftInvite } from "@/server/draft/notifications";
 import {
   type ActiveSession,
   broadcastLobby,
@@ -257,6 +259,48 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
         ack({ ok: true });
       } catch (err) {
         console.error("[lobby:start]", err);
+        ack({ ok: false, error: "server_error" });
+      }
+    },
+  );
+
+  // ── lobby:invite-friend ──────────────────────────────────────────────────
+  socket.on(
+    "lobby:invite-friend",
+    async (
+      payload: { sessionId: string; friendUid: string },
+      ack: (res: { ok: boolean; error?: string }) => void,
+    ) => {
+      try {
+        const { sessionId, friendUid } = payload;
+        const activeSession = getSession(sessionId);
+        if (!activeSession) return ack({ ok: false, error: "session_not_found" });
+        if (activeSession.state.status !== "lobby") return ack({ ok: false, error: "not_in_lobby" });
+
+        await connectToDatabase();
+
+        // Verify accepted friendship before sending the invite.
+        const pair = canonicalPair(user.uid, friendUid);
+        const friendship = await Friendship.findOne({
+          ...pair,
+          status: "accepted",
+        }).lean();
+
+        if (!friendship) return ack({ ok: false, error: "not_friends" });
+
+        const { shortCode } = activeSession;
+        await sendDraftInvite(
+          io,
+          user.uid,
+          user.displayName ?? user.email,
+          friendUid,
+          sessionId,
+          shortCode,
+        );
+
+        ack({ ok: true });
+      } catch (err) {
+        console.error("[lobby:invite-friend]", err);
         ack({ ok: false, error: "server_error" });
       }
     },

@@ -7,6 +7,8 @@ import { Notification } from "@/lib/models/Notification";
 import { DraftSession } from "@/lib/models/DraftSession";
 import { SoloDraftSession } from "@/lib/models/SoloDraftSession";
 import { CardSet } from "@/lib/models/CardSet";
+import { Friendship } from "@/lib/models/Friendship";
+import { User } from "@/lib/models/User";
 import { getCollectionStats } from "@/lib/game/collection";
 import { ACHIEVEMENT_DEFS } from "@/lib/game/achievements";
 
@@ -57,6 +59,22 @@ export interface RecentDeck {
   updatedAt: string;
 }
 
+export interface FriendActivity {
+  uid: string;
+  displayName: string;
+  photoURL: string;
+  /**
+   * lastLoginAt from the DB. Note: online presence (socket-connected) is only
+   * available in the socket server process, not Next.js API routes. Use
+   * lastLoginAt for recency indication on the dashboard.
+   */
+  lastLoginAt: string | null;
+}
+
+export interface FriendsActivityData {
+  friends: FriendActivity[];
+}
+
 export interface DashboardWidgets {
   inProgress: InProgressDraft[];
   recentDecks: RecentDeck[];
@@ -78,6 +96,7 @@ export interface DashboardData {
   pendingInvites: PendingInvite[];
   openLobbies: OpenLobby[];
   recommendation: Recommendation | null;
+  friendsActivity: FriendsActivityData;
 }
 
 const TX_REASON_LABEL: Record<string, string> = {
@@ -108,6 +127,7 @@ export async function getDashboardData(
     userDecks,
     activeMultiplayer,
     activeSolo,
+    friendships,
   ] = await Promise.all([
     getCollectionStats(userId),
     Transaction.find({ userId }, { type: 1, amount: 1, reason: 1, createdAt: 1 })
@@ -154,6 +174,12 @@ export async function getDashboardData(
       .sort({ updatedAt: -1 })
       .limit(5)
       .lean(),
+    Friendship.find(
+      { $or: [{ userA: userId }, { userB: userId }], status: "accepted" },
+      { userA: 1, userB: 1 },
+    )
+      .limit(10)
+      .lean(),
   ]);
 
   // Build unified activity feed
@@ -189,6 +215,36 @@ export async function getDashboardData(
   }
 
   feedItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Build friends-activity data (up to 5 friends, sorted by lastLoginAt desc).
+  const friendUids = friendships.map((f) =>
+    f.userA === userId ? f.userB : f.userA,
+  );
+  const friendUsers =
+    friendUids.length > 0
+      ? await User.find(
+          { uid: { $in: friendUids } },
+          { uid: 1, displayName: 1, photoURL: 1, lastLoginAt: 1 },
+        ).lean()
+      : [];
+
+  const friendsActivity: FriendsActivityData = {
+    friends: friendUsers
+      .sort((a, b) => {
+        const aTime = a.lastLoginAt ? (a.lastLoginAt as Date).getTime() : 0;
+        const bTime = b.lastLoginAt ? (b.lastLoginAt as Date).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 5)
+      .map((u) => ({
+        uid: u.uid,
+        displayName: u.displayName ?? "",
+        photoURL: u.photoURL ?? "",
+        lastLoginAt: u.lastLoginAt
+          ? (u.lastLoginAt as Date).toISOString()
+          : null,
+      })),
+  };
 
   const setMap = new Map(sets.map((s) => [s.code, s]));
   const setName = (code: string) => setMap.get(code)?.name || code.toUpperCase();
@@ -250,8 +306,8 @@ export async function getDashboardData(
     pendingInvites: invites.map((n) => ({
       id: String(n._id),
       fromDisplayName: n.fromDisplayName,
-      shortCode: n.shortCode,
-      sessionId: n.sessionId,
+      shortCode: n.shortCode ?? "",
+      sessionId: n.sessionId ?? "",
       createdAt: (n.createdAt as Date).toISOString(),
     })),
     openLobbies: openLobbies.map((s) => ({
@@ -270,5 +326,6 @@ export async function getDashboardData(
           boosterPrice: recSet.boosterPrice,
         }
       : null,
+    friendsActivity,
   };
 }

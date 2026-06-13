@@ -8,8 +8,9 @@ interface NotificationItem {
   id: string;
   type: string;
   fromDisplayName: string;
-  shortCode: string;
-  sessionId: string;
+  /** Present for draft_invite / draft_started; absent for friend notifications. */
+  shortCode?: string | null;
+  sessionId?: string | null;
   read: boolean;
   createdAt: string;
 }
@@ -31,6 +32,12 @@ function notificationLabel(n: NotificationItem): string {
   }
   if (n.type === "draft_started") {
     return `Draft started — join now`;
+  }
+  if (n.type === "friend_request") {
+    return `${n.fromDisplayName || "Someone"} sent you a friend request`;
+  }
+  if (n.type === "friend_accepted") {
+    return `${n.fromDisplayName || "Someone"} accepted your friend request`;
   }
   return "Notification";
 }
@@ -91,15 +98,23 @@ export function NotificationList({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{notificationLabel(n)}</p>
               <p className="text-muted-foreground text-xs">
-                Code: {n.shortCode} · {timeAgo(n.createdAt)}
+                {n.shortCode ? `Code: ${n.shortCode} · ` : ""}{timeAgo(n.createdAt)}
               </p>
             </div>
-            {(n.type === "draft_invite" || n.type === "draft_started") ? (
+            {(n.type === "draft_invite" || n.type === "draft_started") && n.shortCode ? (
               <Link
                 href={`/draft?code=${n.shortCode}`}
                 className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Join
+              </Link>
+            ) : null}
+            {n.type === "friend_request" || n.type === "friend_accepted" ? (
+              <Link
+                href="/friends"
+                className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Friends
               </Link>
             ) : null}
           </li>

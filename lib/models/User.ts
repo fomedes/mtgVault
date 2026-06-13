@@ -21,6 +21,12 @@ const userSchema = new Schema(
     preferences: {
       background: { type: String, default: "none" },
     },
+    /**
+     * Unique 8-digit numeric code used to send friend requests (D17).
+     * Sparse so existing users without a code don't conflict.
+     * Generated lazily on first call to GET /api/me/friendcode.
+     */
+    friendCode: { type: String, sparse: true, unique: true },
   },
   { timestamps: true },
 );

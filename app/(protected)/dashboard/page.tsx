@@ -16,8 +16,15 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const { stats, widgets, feed, pendingInvites, openLobbies, recommendation } =
-    await getDashboardData(user.uid, user.vaultCoins);
+  const {
+    stats,
+    widgets,
+    feed,
+    pendingInvites,
+    openLobbies,
+    recommendation,
+    friendsActivity,
+  } = await getDashboardData(user.uid, user.vaultCoins);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10">
@@ -100,7 +107,7 @@ export default async function DashboardPage() {
             earned={widgets.achievements.earned}
             total={widgets.achievements.total}
           />
-          <FriendsActivity />
+          <FriendsActivity friends={friendsActivity.friends} />
         </div>
       </div>
     </main>

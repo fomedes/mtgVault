@@ -11,6 +11,7 @@ import { User } from "@/lib/models/User";
 import { registerLobbyHandlers } from "@/server/draft/lobby";
 import { registerDraftHandlers } from "@/server/draft/events";
 import { handleDisconnect, registerReconnectHandlers } from "@/server/draft/reconnect";
+import { markOffline, markOnline } from "@/server/presence";
 
 interface SocketUser {
   uid: string;
@@ -72,12 +73,15 @@ async function main() {
     const user = socket.data.user as SocketUser;
     console.log(`[socket] connected: ${user.email}`);
 
+    markOnline(user.uid);
+
     registerLobbyHandlers(io, socket);
     registerDraftHandlers(io, socket);
     registerReconnectHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       console.log(`[socket] disconnected: ${user.email} (${reason})`);
+      markOffline(user.uid);
       handleDisconnect(io, socket, user.uid);
     });
   });

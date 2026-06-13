@@ -6,7 +6,12 @@ import {
   type Model,
 } from "mongoose";
 
-export const NOTIFICATION_TYPES = ["draft_invite", "draft_started"] as const;
+export const NOTIFICATION_TYPES = [
+  "draft_invite",
+  "draft_started",
+  "friend_request",
+  "friend_accepted",
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 const notificationSchema = new Schema(
@@ -15,8 +20,13 @@ const notificationSchema = new Schema(
     type: { type: String, enum: NOTIFICATION_TYPES, required: true },
     fromUid: { type: String, required: true },
     fromDisplayName: { type: String, default: "" },
-    sessionId: { type: String, required: true },
-    shortCode: { type: String, required: true },
+    /** Draft invite fields — optional for friend notifications. */
+    sessionId: { type: String },
+    shortCode: { type: String },
+    /** Friendship ID for friend_request notifications. */
+    friendshipId: { type: String },
+    /** Extensible metadata for future notification types. */
+    metadata: { type: Map, of: String },
     read: { type: Boolean, default: false },
   },
   { timestamps: true },

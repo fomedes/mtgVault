@@ -22,8 +22,8 @@ export default async function NotificationsPage() {
     id: String(n._id),
     type: n.type as string,
     fromDisplayName: n.fromDisplayName,
-    shortCode: n.shortCode,
-    sessionId: n.sessionId,
+    shortCode: n.shortCode ?? null,
+    sessionId: n.sessionId ?? null,
     read: n.read,
     createdAt: (n.createdAt as Date).toISOString(),
   }));

@@ -13,6 +13,7 @@ export const NAV_LINKS: NavLink[] = [
   { href: "/decks", label: "Decks" },
   { href: "/history", label: "History" },
   { href: "/cards", label: "Card Library" },
+  { href: "/friends", label: "Friends" },
 ];
 
 export const ADMIN_LINK: NavLink = { href: "/admin", label: "Admin" };
