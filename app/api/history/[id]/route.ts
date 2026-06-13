@@ -40,11 +40,17 @@ export async function GET(
     return doc ? toCardListItem(doc) : null;
   }).filter(Boolean);
 
+  // Cast to access schema fields added by the DB agent (kind, difficulty);
+  // InferSchemaType picks them up once the model is updated.
+  const deckRecord = deck as Record<string, unknown>;
+
   return NextResponse.json({
     sessionId: deck.sessionId,
     setCode: deck.setCode,
     cards,
     cardIds: deck.cardIds,
     createdAt: (deck.createdAt as Date).toISOString(),
+    kind: (deckRecord.kind as string | undefined) ?? 'multiplayer',
+    difficulty: (deckRecord.difficulty as string | undefined) ?? undefined,
   });
 }

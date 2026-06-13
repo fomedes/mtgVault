@@ -13,6 +13,8 @@ const savedDeckSchema = new Schema(
     setCode: { type: String, required: true, lowercase: true },
     /** MongoDB ObjectId strings of all cards picked, in pick order. */
     cardIds: [{ type: String, required: true }],
+    kind: { type: String, enum: ['multiplayer', 'phantom'], default: 'multiplayer', required: true },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'] }, // optional, phantom only
   },
   { timestamps: true },
 );

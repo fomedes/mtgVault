@@ -48,11 +48,13 @@ export function useSocketConnection(): Socket {
     function onLobbyState(data: {
       sessionId: string;
       shortCode: string;
+      setCode?: string;
       players: { uid: string; displayName: string; seatIndex: number; isReady: boolean }[];
     }) {
       store().applyLobbyState({
         sessionId: data.sessionId,
         shortCode: data.shortCode,
+        setCode: data.setCode,
         players: data.players,
         hostUid: data.players?.[0]?.uid,
       });

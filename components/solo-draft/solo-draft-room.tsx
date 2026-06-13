@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { PackGrid } from "@/components/draft/pack-grid";
-import { PickedTray } from "@/components/draft/picked-tray";
-import { buttonVariants } from "@/components/ui/button";
+import { DraftRoomView } from "@/components/draft/draft-room-view";
+import { DraftSummary } from "@/components/draft/draft-summary";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 import type { SoloDraftView } from "@/lib/game/solo-draft";
 
@@ -61,102 +59,30 @@ export function SoloDraftRoom({ initial }: Props) {
   }
 
   if (session.status === "complete") {
-    return <SoloDraftComplete session={session} cardCache={cardCache} />;
+    return (
+      <DraftSummary
+        sessionId={session.sessionId}
+        setCode={session.setCode}
+        kind="phantom"
+        difficulty={session.difficulty}
+        cardIds={session.picks}
+        cardCache={cardCache}
+      />
+    );
   }
 
-  const DIFFICULTY_LABEL: Record<string, string> = { easy: "Easy", medium: "Medium", hard: "Hard" };
-
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-      {/* Pack + status */}
-      <div className="flex-1 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium">
-              Round {session.round + 1} of {session.numPacks} · Pick {session.pickInRound + 1} of 15
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {session.currentPack.length} cards in pack ·{" "}
-              {picking
-                ? "Bots are picking…"
-                : session.needsPick
-                  ? "Your pick"
-                  : "Waiting…"}
-            </p>
-          </div>
-          <span className="text-muted-foreground text-xs rounded-md border px-2 py-0.5">
-            {DIFFICULTY_LABEL[session.difficulty] ?? session.difficulty}
-          </span>
-        </div>
-
-        <PackGrid
-          cardIds={session.currentPack}
-          cardCache={cardCache}
-          onPick={handlePick}
-          disabled={picking || !session.needsPick}
-        />
-      </div>
-
-      {/* Picks tray */}
-      <aside className="lg:w-56 shrink-0">
-        <PickedTray cardIds={session.picks} cardCache={cardCache} />
-      </aside>
-    </div>
-  );
-}
-
-function SoloDraftComplete({
-  session,
-  cardCache,
-}: {
-  session: SoloDraftView;
-  cardCache: Map<string, CardListItemDto>;
-}) {
-  return (
-    <div className="space-y-8">
-      <div className="space-y-1">
-        <p className="text-2xl font-bold">Draft complete!</p>
-        <p className="text-muted-foreground text-sm">
-          Phantom solo draft — cards are not added to your collection.
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        <p className="text-sm font-medium">
-          Your picks ({session.picks.length})
-        </p>
-        <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
-          {session.picks.map((id, i) => {
-            const card = cardCache.get(id);
-            const image = card?.imageUris ?? card?.cardFaces[0]?.imageUris;
-            return (
-              <div key={`${id}-${i}`} className="w-full">
-                {image?.small ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={image.small}
-                    alt={card?.name ?? ""}
-                    className="w-full rounded-[4.75%/3.43%]"
-                  />
-                ) : (
-                  <div className="aspect-[63/88] rounded-[4.75%/3.43%] bg-muted flex items-center justify-center text-[10px] text-muted-foreground p-1 text-center">
-                    {card?.name ?? ""}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex gap-3">
-        <Link href="/solo-draft" className={buttonVariants()}>
-          New draft
-        </Link>
-        <Link href="/history" className={buttonVariants({ variant: "outline" })}>
-          Draft history
-        </Link>
-      </div>
-    </div>
+    <DraftRoomView
+      currentPack={session.currentPack}
+      myPicks={session.picks}
+      round={session.round}
+      pickInRound={session.pickInRound}
+      numPacks={session.numPacks}
+      needsPick={session.needsPick}
+      difficulty={session.difficulty}
+      picking={picking}
+      cardCache={cardCache}
+      onPick={handlePick}
+    />
   );
 }

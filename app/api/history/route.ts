@@ -12,7 +12,7 @@ export async function GET() {
 
   const decks = await SavedDeck.find(
     { userId: guard.user.uid },
-    { sessionId: 1, setCode: 1, cardIds: 1, createdAt: 1 },
+    { sessionId: 1, setCode: 1, cardIds: 1, createdAt: 1, kind: 1 },
   )
     .sort({ createdAt: -1 })
     .limit(50)
@@ -35,6 +35,7 @@ export async function GET() {
         pickCount: d.cardIds.length,
         completedAt: (d.createdAt as Date).toISOString(),
         players: session?.players?.map((p) => p.displayName) ?? [],
+        kind: ((d as Record<string, unknown>).kind as string | undefined) ?? 'multiplayer',
       };
     }),
   });

@@ -9,6 +9,7 @@ export interface DraftStoreState {
   // Session
   sessionId: string | null;
   shortCode: string | null;
+  setCode: string | null;
 
   // Lobby
   lobbyPlayers: Array<{
@@ -34,9 +35,10 @@ export interface DraftStoreState {
 
   // Actions
   setSocketConnected: (v: boolean) => void;
-  applyLobbyState: (s: { sessionId: string; shortCode: string; players: DraftStoreState["lobbyPlayers"]; hostUid?: string }) => void;
+  applyLobbyState: (s: { sessionId: string; shortCode: string; setCode?: string; players: DraftStoreState["lobbyPlayers"]; hostUid?: string }) => void;
   applyPlayerView: (view: PlayerView) => void;
   setTimerExpiresAt: (ts: number | null) => void;
+  setSetCode: (code: string) => void;
   // keys are MongoDB ObjectId strings (matching pack/pick state IDs)
   cacheCards: (cards: Record<string, CardListItemDto>) => void;
   reset: () => void;
@@ -48,12 +50,14 @@ const initial: Omit<
   | "applyLobbyState"
   | "applyPlayerView"
   | "setTimerExpiresAt"
+  | "setSetCode"
   | "cacheCards"
   | "reset"
 > = {
   socketConnected: false,
   sessionId: null,
   shortCode: null,
+  setCode: null,
   lobbyPlayers: [],
   hostUid: null,
   status: "idle",
@@ -76,6 +80,7 @@ export const useDraftStore = create<DraftStoreState>((set) => ({
     set({
       sessionId: s.sessionId,
       shortCode: s.shortCode,
+      setCode: s.setCode ?? null,
       lobbyPlayers: s.players,
       hostUid: s.hostUid ?? null,
       status: "lobby",
@@ -93,6 +98,8 @@ export const useDraftStore = create<DraftStoreState>((set) => ({
     }),
 
   setTimerExpiresAt: (ts) => set({ timerExpiresAt: ts }),
+
+  setSetCode: (code) => set({ setCode: code }),
 
   cacheCards: (cards) =>
     set((s) => {

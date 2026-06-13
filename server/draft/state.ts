@@ -100,6 +100,7 @@ export function broadcastLobby(io: Server, sessionId: string): void {
   io.to(sessionId).emit("lobby:state", {
     sessionId,
     shortCode: active.shortCode,
+    setCode: active.state.setCode,
     players: active.state.players,
     status: active.state.status,
   });

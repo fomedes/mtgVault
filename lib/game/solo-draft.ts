@@ -11,6 +11,7 @@
 import { connectToDatabase } from "@/lib/db";
 import { Card } from "@/lib/models/Card";
 import { SoloDraftSession } from "@/lib/models/SoloDraftSession";
+import { SavedDeck } from "@/lib/models/SavedDeck";
 import { generateBooster } from "@/lib/game/booster";
 import {
   createDraft,
@@ -86,6 +87,7 @@ export interface SoloDraftView {
   round: number;
   pickInRound: number;
   needsPick: boolean;
+  savedDeckId?: string;
 }
 
 export interface SoloDraftSummary {
@@ -162,6 +164,7 @@ export async function getSoloDraftView(
     doc.difficulty as BotDifficulty,
     doc.status as "drafting" | "complete",
     view,
+    undefined,
   );
 }
 
@@ -196,7 +199,20 @@ export async function humanPick(
   if (complete) {
     doc.picks = state.picks[HUMAN_SEAT];
   }
+  let savedDeckId: string | undefined;
   await doc.save();
+
+  if (complete) {
+    const sdoc = await SavedDeck.create({
+      userId: doc.userId,
+      sessionId: sessionId,
+      setCode: doc.setCode,
+      cardIds: state.picks[HUMAN_SEAT],
+      kind: 'phantom',
+      difficulty: doc.difficulty,
+    });
+    savedDeckId = sdoc._id.toString();
+  }
 
   const view = getPlayerView(state, HUMAN_SEAT);
   return toSoloDraftView(
@@ -205,6 +221,7 @@ export async function humanPick(
     doc.difficulty as BotDifficulty,
     doc.status as "drafting" | "complete",
     view,
+    savedDeckId,
   );
 }
 
@@ -237,6 +254,7 @@ function toSoloDraftView(
   difficulty: BotDifficulty,
   status: "drafting" | "complete",
   view: ReturnType<typeof getPlayerView>,
+  savedDeckId?: string,
 ): SoloDraftView {
   return {
     sessionId,
@@ -249,5 +267,6 @@ function toSoloDraftView(
     round: view.round,
     pickInRound: view.pickInRound,
     needsPick: view.needsPick,
+    savedDeckId,
   };
 }

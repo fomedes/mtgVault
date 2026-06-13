@@ -33,14 +33,16 @@ export interface CardListItemDto {
   colors: string[];
   colorIdentity: string[];
   layout: string;
+  cmc: number;
+  oracleText: string;
   imageUris?: ImageUrisDto;
   cardFaces: CardFaceDto[];
 }
 
 export interface CardDetailDto extends CardListItemDto {
-  oracleText: string;
+  // oracleText and cmc are now on CardListItemDto; kept here as type aliases
+  // for consumers that reference CardDetailDto specifically.
   flavorText: string;
-  cmc: number;
   power?: string;
   toughness?: string;
   loyalty?: string;
@@ -86,6 +88,8 @@ export function toCardListItem(card: CardDoc): CardListItemDto {
     colors: card.colors,
     colorIdentity: card.colorIdentity,
     layout: card.layout,
+    cmc: card.cmc,
+    oracleText: card.oracleText,
     imageUris: toImageUrisDto(card.imageUris),
     cardFaces: card.cardFaces.map(toCardFaceDto),
   };
@@ -100,9 +104,8 @@ export function toCardDetail(card: CardDoc): CardDetailDto {
 
   return {
     ...toCardListItem(card),
-    oracleText: card.oracleText,
+    // oracleText and cmc are already included via toCardListItem.
     flavorText: card.flavorText,
-    cmc: card.cmc,
     power: card.power ?? undefined,
     toughness: card.toughness ?? undefined,
     loyalty: card.loyalty ?? undefined,

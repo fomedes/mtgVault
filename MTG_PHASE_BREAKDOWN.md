@@ -350,7 +350,7 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 11 — Draft Experience Overhaul
 
-> **Status (2026-06-13):** Not started. Per-task tracking in `PHASE_PROGRESS/PHASE11_PROGRESS.md`.
+> **Status (2026-06-13):** COMPLETE. typecheck clean · 266 tests pass (28 new). Per-task tracking in `PHASE_PROGRESS/PHASE11_PROGRESS.md`.
 
 **Goal:** Make multiplayer and phantom drafts share **one UI** (logic differs only in backend transport: socket vs REST), give the picking phase more room, add hover-zoom to picked cards, add a live draft stats panel, and turn the completion screen into a richer, **saveable** summary. Consumes Phase 9; implements the recording half of **D19**.
 

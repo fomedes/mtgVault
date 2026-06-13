@@ -38,6 +38,7 @@ export async function completeDraft(state: DraftState): Promise<void> {
         sessionId: state.sessionId,
         setCode: state.setCode,
         cardIds: state.picks[seatIndex],
+        kind: 'multiplayer',
       }).then(() => undefined),
     );
 
