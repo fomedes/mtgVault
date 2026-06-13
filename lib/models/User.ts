@@ -17,6 +17,10 @@ const userSchema = new Schema(
     isAllowlisted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     lastDailyBonusAt: { type: Date },
+    /** UI preferences (D14). `background` is a background-manifest id, "none" by default. */
+    preferences: {
+      background: { type: String, default: "none" },
+    },
   },
   { timestamps: true },
 );

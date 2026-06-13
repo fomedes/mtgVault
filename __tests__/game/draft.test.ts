@@ -90,6 +90,25 @@ describe("pickCard", () => {
     const s = { ...fullDraft2P(), status: "lobby" as const };
     expect(() => pickCard(s, 0, s.currentPacks[0][0])).toThrow("not_drafting");
   });
+
+  it("removes only ONE instance when the pack contains duplicate card IDs", () => {
+    // Boosters sample with replacement, so duplicate IDs are possible.
+    // A filter-based removal would strip both copies, shrinking the pack by 2.
+    const dupCard = "dup-card";
+    const pack: string[] = [dupCard, dupCard, "other-card"];
+    const state = createDraft(
+      "dup-test",
+      "tst",
+      PLAYERS_2,
+      [[pack, fakePack(0, 1), fakePack(0, 2)], makeAllPacks(2)[1]],
+      60_000,
+      3,
+    );
+    const after = pickCard(state, 0, dupCard);
+    // Pack should still contain the second copy.
+    expect(after.currentPacks[0]).toHaveLength(pack.length - 1);
+    expect(after.currentPacks[0]).toContain(dupCard);
+  });
 });
 
 // ── Pack rotation ─────────────────────────────────────────────────────────────

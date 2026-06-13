@@ -139,9 +139,13 @@ export function pickCard(
   if (!state.currentPacks[seatIndex].includes(cardId))
     throw new Error("card_not_in_pack");
 
-  const newCurrentPacks = state.currentPacks.map((pack, i) =>
-    i === seatIndex ? pack.filter((c) => c !== cardId) : [...pack],
-  );
+  const newCurrentPacks = state.currentPacks.map((pack, i) => {
+    if (i !== seatIndex) return [...pack];
+    // Remove only the first occurrence — packs can contain duplicate card IDs
+    // (boosters sample with replacement) and filter() would wrongly remove all copies.
+    const idx = pack.indexOf(cardId);
+    return [...pack.slice(0, idx), ...pack.slice(idx + 1)];
+  });
   const newPicks = state.picks.map((p, i) =>
     i === seatIndex ? [...p, cardId] : [...p],
   );

@@ -2,8 +2,10 @@ import { connectToDatabase } from "@/lib/db";
 import { Transaction } from "@/lib/models/Transaction";
 import { Achievement } from "@/lib/models/Achievement";
 import { SavedDeck } from "@/lib/models/SavedDeck";
+import { Deck } from "@/lib/models/Deck";
 import { Notification } from "@/lib/models/Notification";
 import { DraftSession } from "@/lib/models/DraftSession";
+import { SoloDraftSession } from "@/lib/models/SoloDraftSession";
 import { CardSet } from "@/lib/models/CardSet";
 import { getCollectionStats } from "@/lib/game/collection";
 import { ACHIEVEMENT_DEFS } from "@/lib/game/achievements";
@@ -39,13 +41,39 @@ export interface Recommendation {
   boosterPrice: number;
 }
 
+export interface InProgressDraft {
+  kind: "multiplayer" | "phantom";
+  id: string;
+  href: string;
+  setCode: string;
+  setName: string;
+  updatedAt: string;
+}
+
+export interface RecentDeck {
+  id: string;
+  name: string;
+  cardCount: number;
+  updatedAt: string;
+}
+
+export interface DashboardWidgets {
+  inProgress: InProgressDraft[];
+  recentDecks: RecentDeck[];
+  achievements: { earned: number; total: number };
+}
+
 export interface DashboardData {
   stats: {
     uniqueCards: number;
     totalCards: number;
-    draftsPlayed: number;
+    /** Completed multiplayer drafts (saved pick lists). */
+    draftsMultiplayer: number;
+    /** Completed phantom (solo) drafts. */
+    draftsPhantom: number;
     vaultCoins: number;
   };
+  widgets: DashboardWidgets;
   feed: FeedEvent[];
   pendingInvites: PendingInvite[];
   openLobbies: OpenLobby[];
@@ -71,11 +99,15 @@ export async function getDashboardData(
     collectionStats,
     transactions,
     achievements,
-    recentDecks,
+    recentDraftDecks,
     invites,
     openLobbies,
     sets,
-    draftsPlayed,
+    draftsMultiplayer,
+    draftsPhantom,
+    userDecks,
+    activeMultiplayer,
+    activeSolo,
   ] = await Promise.all([
     getCollectionStats(userId),
     Transaction.find({ userId }, { type: 1, amount: 1, reason: 1, createdAt: 1 })
@@ -103,6 +135,25 @@ export async function getDashboardData(
       .lean(),
     CardSet.find({ enabled: true }, { code: 1, name: 1, boosterPrice: 1 }).lean(),
     SavedDeck.countDocuments({ userId }),
+    SoloDraftSession.countDocuments({ userId, status: "complete" }),
+    Deck.find({ userId }, { name: 1, cards: 1, updatedAt: 1 })
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .lean(),
+    DraftSession.find(
+      { status: "drafting", "players.uid": userId },
+      { sessionId: 1, setCode: 1, updatedAt: 1 },
+    )
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .lean(),
+    SoloDraftSession.find(
+      { userId, status: "drafting" },
+      { setCode: 1, updatedAt: 1 },
+    )
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .lean(),
   ]);
 
   // Build unified activity feed
@@ -128,7 +179,7 @@ export async function getDashboardData(
     });
   }
 
-  for (const deck of recentDecks) {
+  for (const deck of recentDraftDecks) {
     feedItems.push({
       type: "draft_complete",
       date: (deck.createdAt as Date).toISOString(),
@@ -140,6 +191,36 @@ export async function getDashboardData(
   feedItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const setMap = new Map(sets.map((s) => [s.code, s]));
+  const setName = (code: string) => setMap.get(code)?.name || code.toUpperCase();
+
+  // In-progress drafts to resume (multiplayer rooms first, then solo).
+  const inProgress: InProgressDraft[] = [
+    ...activeMultiplayer.map((s) => ({
+      kind: "multiplayer" as const,
+      id: s.sessionId,
+      href: "/draft",
+      setCode: s.setCode,
+      setName: setName(s.setCode),
+      updatedAt: ((s.updatedAt as Date) ?? new Date()).toISOString(),
+    })),
+    ...activeSolo.map((s) => ({
+      kind: "phantom" as const,
+      id: String(s._id),
+      href: `/solo-draft/${String(s._id)}`,
+      setCode: s.setCode,
+      setName: setName(s.setCode),
+      updatedAt: ((s.updatedAt as Date) ?? new Date()).toISOString(),
+    })),
+  ]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
+
+  const recentDecks: RecentDeck[] = userDecks.map((d) => ({
+    id: String(d._id),
+    name: d.name,
+    cardCount: (d.cards ?? []).reduce((sum, c) => sum + (c.quantity ?? 0), 0),
+    updatedAt: ((d.updatedAt as Date) ?? new Date()).toISOString(),
+  }));
 
   // Cheapest affordable set, preferring the most expensive (most interesting)
   const affordableSets = sets
@@ -151,8 +232,19 @@ export async function getDashboardData(
     stats: {
       uniqueCards: collectionStats.uniqueCards,
       totalCards: collectionStats.totalCards,
-      draftsPlayed,
+      draftsMultiplayer,
+      draftsPhantom,
       vaultCoins,
+    },
+    widgets: {
+      inProgress,
+      recentDecks,
+      achievements: {
+        // `achievements` is the recent list capped at 10; total defs (4) is
+        // well under that cap, so its length is the exact earned count.
+        earned: achievements.length,
+        total: ACHIEVEMENT_DEFS.length,
+      },
     },
     feed: feedItems.slice(0, 10),
     pendingInvites: invites.map((n) => ({

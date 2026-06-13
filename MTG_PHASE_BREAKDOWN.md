@@ -1,6 +1,8 @@
 # MTG Vault — Phase Breakdown
 
 > Generated 2026-06-11 from `MTGVAULT_PROJECT_OVERVIEW.md` §14. This is the working plan: granular tasks per phase, agent assignments, and dependency ordering. The Orchestrator reads this file at the start of every phase. Update task status in place as work lands.
+>
+> **Expanded 2026-06-13:** Phases 0–7 shipped. A second wave (Phases 8–15) was added covering navigation/dashboard, theming, deck-builder & draft UX, history, set blocks, and friends. See decisions **D12–D19** below; each new phase has a companion `PHASE_PROGRESS/PHASEx_PROGRESS.md` for task-level tracking.
 
 ---
 
@@ -22,6 +24,21 @@ These answers to the overview's §12 open questions (plus foundational tooling c
 | D10 | **Hosting**                  | **$0 to start:** Next.js on Vercel (free) + Socket.io server on **Render free tier** + MongoDB Atlas M0. Known tradeoff: Render sleeps after 15 min idle → first lobby visitor waits ~30–60 s cold start; active drafts stay awake. **Upgrade path:** Railway Hobby ($5/mo flat, always warm) if cold starts become annoying. Railway's free tier was rejected — its $1/mo credit hard-stops the server mid-month. |
 | D11 | **Language/runtime**         | TypeScript strict mode everywhere; Node LTS; latest stable Next.js (App Router).                                                                                                                                                                                                                                                                                                                                   |
 
+### Expansion decisions (Phases 8–15, confirmed with the owner 2026-06-13)
+
+The owner reviewed Phases 0–7 and commissioned a second wave of work (navigation/dashboard, theming, deck-builder and draft UX, history, set blocks, friends). These decisions scope Phases 8–15 and supersede earlier wording where they conflict:
+
+| #   | Decision                  | Resolution                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D12 | **Dashboard composition** | The navbar is the **single canonical menu**. The dashboard's "Quick Links" panel (a duplicate of the navbar) is **removed** and replaced with data widgets: collection snapshot, resume-draft, recent decks, achievement progress, and a friends-activity widget (placeholder until P14).                                                                                              |
+| D13 | **Navigation overhaul**   | Mobile nav becomes a **burger-triggered overlay**; desktop keeps the inline bar. Labels renamed: Draft → **Multiplayer Draft**, Solo → **Phantom Draft**, Collection → **My Collection**, Browse → **Card Library** (Home/Shop/Decks/History unchanged). "Drafts played" becomes **X/Y** (X = multiplayer, Y = phantom) with a "Multiplayer / Phantom" caption.                          |
+| D14 | **Theming & backgrounds** | Fix the card/background clash by adjusting the background theme token so black card borders read against the page. Add a user-selectable MTG **wallpaper** layer: assets in `public/backgrounds/`, **WebP @ ~2560×1440, < 400 KB each**, rendered as a fixed, dimmed/blurred subtle layer behind content; choice stored on `User.preferences`, "None" is the default.                     |
+| D15 | **Shared card primitives**| Two reusable pieces built once and consumed by deck builder, draft, collection and library: a **hover/zoom card preview** (`CardPreview`) and a **stats panel** backed by a pure `lib/game/deck-stats.ts` engine. No duplicated stats/preview logic per surface.                                                                                                                        |
+| D16 | **Stats depth**           | **Comprehensive**: full type breakdown (creature/instant/sorcery/artifact/enchantment/planeswalker/battle/land), mana curve with **lands excluded and counted separately**, colour breakdown, average CMC (nonland), creature count, colour-pip/source counts, rarity mix, colour devotion, removal/card-advantage tags (oracle-text heuristics), and lightweight archetype hints.     |
+| D17 | **Friends & social**      | Friendship via a per-user **numeric friend code** with a request/accept flow. Friends unlock: direct draft-lobby invites, presence/activity surfacing, and **read-only collection & deck viewing** (foundation for future trading).                                                                                                                                                   |
+| D18 | **Set blocks**            | Add a `block` field to `Set`; the Card Library groups sets under **collapsible block sections** (standalone sets in their own section). Seed the original **Ravnica block** (`rav`, `gpt`, `dis`) and **Urza block** (`usg`, `ulg`, `uds`) to prove grouping; **correct the `usa` → `usg` set-code typo** in the seed. Blocks are intentionally incomplete for now — foundation only.    |
+| D19 | **Phantom drafts in history** | Phantom (solo) draft completions are recorded as **read-only pick lists** (no collection ingest, no VC) so they appear in **Draft History** and can seed the Deck Builder. History is filterable **All / Multiplayer / Phantom**, and the dashboard counter splits accordingly.                                                                                                    |
+
 ---
 
 ## 1. Phase Dependency Graph
@@ -35,6 +52,16 @@ P0 Foundation
                      └─► P5 Dashboard & Polish (needs: data from all systems)
                           └─► P6 Deck Builder  (committed; needs: collection + saved drafts)
                                └─► P7 Phantom Solo Draft (needs: draft engine)
+
+P0–P7 shipped ─► expansion (added 2026-06-13):
+ P8  Navigation, Dashboard & Theming    (nav overlay · dashboard widgets · background/wallpapers)
+  └─► P9  Shared Card UX Primitives      (hover-zoom CardPreview + pure deck-stats engine)
+       ├─► P10 Deck Builder Overhaul     (stats · curve fix · type+CMC sort · filter overlay · zoom)
+       └─► P11 Draft Experience Overhaul (MP/phantom UI parity · save list · completion stats)
+            └─► P12 Draft History & Records (record all drafts + filter All/MP/Phantom)
+ P13 Card Library & Set Blocks   (independent — needs P1 cache; collapsible blocks + new sets)
+ P14 Friends & Social            (independent vertical — codes · invites · read-only sharing)
+ P15 Ideas Backlog               (unscheduled; owner sign-off before promotion)
 Backlog: Winston draft · email notifications · scheduled draft sessions
 ```
 
@@ -244,6 +271,201 @@ Agent workflow inside every phase (overview §6.2):
 **Exit criteria**
 
 - A solo draft against 7 bots completes in under 10 minutes; phantom cards never reach the real collection. CI green.
+
+---
+
+## Phase 8 — Navigation, Dashboard & Theming
+
+> **Status (2026-06-13):** ✅ Implemented (typecheck + Phase-8 lint + 172 tests green; live QA pending). Per-task tracking in `PHASE_PROGRESS/PHASE8_PROGRESS.md`.
+
+**Goal:** A coherent navigation shell (canonical menu, mobile overlay, corrected labels), a dashboard that surfaces real activity instead of a duplicate of the navbar, and a background system that no longer clashes with black card borders — plus optional, subtle MTG wallpapers. Implements **D12–D14**.
+
+| ID    | Task                                                                                                                                                                                          | Agent(s)          | Depends on   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------ |
+| P8-01 | Add a `preferences` subdoc to `User` (`background` id; room for future UI prefs) with a safe default; no migration needed (defaults on read)                                                  | db                | P7 done      |
+| P8-02 | Theme fix: adjust the `--background`/card-surface tokens in `app/globals.css` so black card borders separate from the page; re-verify dark **and** light mode contrast                       | design            | P7 done      |
+| P8-03 | Wallpaper assets: curate 4–6 MTG-themed WebP wallpapers in `public/backgrounds/` (~2560×1440, < 400 KB each) + a `lib/backgrounds.ts` manifest (id, label, file, credit)                     | design            | P8-02        |
+| P8-04 | `BackgroundLayer` component: fixed full-viewport, dimmed/blurred scrim behind content, reads the user preference, honours `useReducedMotion`; "None" is the default                          | frontend, design  | P8-03        |
+| P8-05 | Background picker UI (in a profile/settings menu) → `PATCH /api/me/preferences` route persisting to `User.preferences`; optimistic localStorage apply for instant feedback                   | frontend, backend | P8-01, P8-04 |
+| P8-06 | Navbar refactor: single source-of-truth menu config; rename labels (Multiplayer Draft, Phantom Draft, My Collection, Card Library); keep active-state logic                                  | frontend          | P7 done      |
+| P8-07 | Mobile burger → full-screen/overlay menu (scrim + focus trap, Esc/scrim close, reduced-motion); desktop inline bar unchanged                                                                 | frontend, design  | P8-06        |
+| P8-08 | Dashboard API: split draft counts (multiplayer = `SavedDeck` count; phantom = completed `SoloDraftSession` count) + widget payloads (collection snapshot, in-progress drafts, recent decks, achievement progress) | backend           | P7 done      |
+| P8-09 | Dashboard redesign: **remove Quick Links**, add a widget grid — stat cards (incl. **X/Y** "Multiplayer / Phantom" drafts), resume-draft, recent decks, achievements progress, friends-activity (placeholder until P14) | frontend, design  | P8-08        |
+| P8-10 | Security review: preferences route auth + Zod validation; background id is an allowlisted enum (no path traversal/SSRF); asset size/type sanity                                              | security          | P8-05        |
+| P8-11 | Tests: nav active-state + mobile-overlay E2E, preferences API unit/integration, dashboard split-count unit, background-picker persistence E2E                                                | testing           | P8-09        |
+
+**Exit criteria**
+
+- Mobile shows a burger overlay menu; desktop shows the inline bar; all labels are renamed; active states are correct.
+- The dashboard has no duplicated nav links; widgets reflect real data; the drafts stat reads **X/Y** with the "Multiplayer / Phantom" caption.
+- A selected wallpaper persists across reload/sessions; card borders are clearly separated from the background in both dark and light mode. CI green.
+
+---
+
+## Phase 9 — Shared Card UX Primitives
+
+> **Status (2026-06-13):** Not started. Foundation for Phases 10 & 11. Per-task tracking in `PHASE_PROGRESS/PHASE9_PROGRESS.md`.
+
+**Goal:** Build the two reusable pieces every later surface needs — a hover/zoom card preview and a comprehensive stats panel backed by a **pure** engine — so deck builder, draft, collection and library all consume one implementation. Implements **D15–D16**.
+
+| ID    | Task                                                                                                                                                                                                                                                                                                           | Agent(s)         | Depends on |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------- |
+| P9-01 | `lib/game/deck-stats.ts` (pure, zero I/O): from a card list compute type breakdown, mana curve (**lands excluded**, bucketed 0…7+), colour breakdown, average CMC (nonland), creature count, colour-pip/source counts, rarity mix, colour devotion, removal/card-advantage tags (oracle-text heuristics), archetype hint | backend          | P8 done    |
+| P9-02 | `CardPreview` shareable component: hover (desktop) / long-press or tap (touch) shows an enlarged card in a portal layer; viewport-aware positioning, image prefetch, instant fallback under reduced motion, keyboard focusable                                                                                  | design, frontend | P8 done    |
+| P9-03 | `useCardPreview` hook/provider so any miniature list opts in with minimal wiring                                                                                                                                                                                                                              | frontend         | P9-02      |
+| P9-04 | `<DeckStats>` / `<PoolStats>` presentational component consuming P9-01: compact (sidebar) and expanded variants; colour/rarity tokens from the design system                                                                                                                                                  | design, frontend | P9-01      |
+| P9-05 | Wire `CardPreview` into the existing collection/browser miniatures as the first consumer (proves shareability)                                                                                                                                                                                                | frontend         | P9-03      |
+| P9-06 | `cardZoom` animation variant in `lib/animations/` honouring `useReducedMotion`                                                                                                                                                                                                                                | design           | P9-02      |
+| P9-07 | Tests: deck-stats engine unit suite toward near-full coverage (curve excludes lands, type buckets, devotion, tags); `CardPreview` interaction + a11y; `DeckStats` render snapshot                                                                                                                              | testing          | P9-01, P9-04 |
+
+**Exit criteria**
+
+- `deck-stats.ts` is pure and unit-tested (target near-full coverage); lands never count as 0-CMC in the curve.
+- Hovering any miniature in the collection shows a readable enlarged card; touch uses long-press; reduced motion is honoured. CI green.
+
+---
+
+## Phase 10 — Deck Builder Overhaul
+
+> **Status (2026-06-13):** Not started. Per-task tracking in `PHASE_PROGRESS/PHASE10_PROGRESS.md`.
+
+**Goal:** Bring the deck builder up to spec — comprehensive stats, a corrected curve, a type-grouped / CMC-sorted list, an advanced filter overlay on the card source, and hover-zoom on miniatures. Builds on Phase 6 and consumes Phase 9.
+
+| ID     | Task                                                                                                                                                                                                  | Agent(s)         | Depends on   |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |
+| P10-01 | Replace `components/decks/deck-stats.tsx` internals with the P9-01 engine + `<DeckStats>` (Comprehensive); delete the local buggy curve (lands no longer counted as 0-CMC)                            | frontend         | P9 done      |
+| P10-02 | Deck list (`deck-list.tsx` / `deck-card-row.tsx`): group by full card type, sort within each group by **CMC ascending** then name (replaces pick order); collapsible type headers with counts        | frontend, design | P9 done      |
+| P10-03 | Advanced filter overlay on the card source pane: keep the text searchbox, add a **Filters** button opening an overlay — type, colour/colour-identity, block & set (multi), CMC min/max, name, power, toughness, rarity, owned-only; shared filter state | frontend, design | P9 done      |
+| P10-04 | Backend: extend `GET /api/cards` (and the collection query) to accept the new params (`cmcMin`/`cmcMax`, `power`, `toughness`, `block`, multi-`set`, `ownedOnly`) with Zod validation/clamping       | backend          | P10-03       |
+| P10-05 | Integrate `CardPreview` (P9-02) on all deck-builder miniatures (source pane + deck list)                                                                                                             | frontend         | P9 done      |
+| P10-06 | Security review: new query params validated/bounded (no regex injection, numeric ranges clamped, multi-value caps)                                                                                   | security         | P10-04       |
+| P10-07 | Tests: list grouping/sort unit, filter-overlay E2E, stats render with a mixed deck, query-param API integration                                                                                      | testing          | P10-02, P10-04 |
+
+**Exit criteria**
+
+- The stats panel shows the full type breakdown + comprehensive analytics; the curve excludes lands.
+- The deck list is grouped by type and CMC-sorted; the source pane has a working filters overlay covering all listed parameters; miniatures zoom on hover. CI green.
+
+---
+
+## Phase 11 — Draft Experience Overhaul
+
+> **Status (2026-06-13):** Not started. Per-task tracking in `PHASE_PROGRESS/PHASE11_PROGRESS.md`.
+
+**Goal:** Make multiplayer and phantom drafts share **one UI** (logic differs only in backend transport: socket vs REST), give the picking phase more room, add hover-zoom to picked cards, add a live draft stats panel, and turn the completion screen into a richer, **saveable** summary. Consumes Phase 9; implements the recording half of **D19**.
+
+| ID     | Task                                                                                                                                                                                                                                       | Agent(s)         | Depends on        |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------- |
+| P11-01 | Audit & unify draft-room components so `draft-room.tsx` (MP) and `solo-draft-room.tsx` (phantom) render the **same** presentational components, differing only in the data/transport hook (socket vs REST)                                | frontend         | P9 done           |
+| P11-02 | Picking layout: move the picked tray to the **bottom**; give the active booster more space and larger cards; mobile = vertical list per §10                                                                                               | frontend, design | P11-01            |
+| P11-03 | Picked tray: integrate `CardPreview` (P9-02) so each picked miniature zooms to a readable card                                                                                                                                            | frontend         | P9 done, P11-01   |
+| P11-04 | Live draft stats: embed `<PoolStats>` (P9-04) over the picked pool (curve/types/colours/archetype hint) during and after the draft                                                                                                       | frontend         | P9 done           |
+| P11-05 | Save-list flow: on completion persist the human seat's picks as a read-only record — including **phantom** drafts (new `format`/`kind: 'phantom'` flag; **no ingest, no VC**); add a "Build a deck" CTA seeding the Deck Builder (reuses P6-04) | backend, db      | P11-01            |
+| P11-06 | Completion screen redesign: pool summary + `<PoolStats>`, pick timeline, set/difficulty/seat context, export, and "Build a deck" / "Save list" actions                                                                                    | frontend, design | P11-04, P11-05    |
+| P11-07 | Parity QA: confirm both draft types expose identical affordances (save, stats, hover, layout)                                                                                                                                             | testing          | P11-06            |
+| P11-08 | Security review: server stays authoritative; phantom save writes only the owner's own picks; **no ingest/VC path** is triggered for phantom                                                                                               | security         | P11-05            |
+| P11-09 | Tests: phantom completion saves a record without ingest/VC, completion stats render, layout E2E (mobile + desktop), MP/phantom parity snapshot                                                                                            | testing          | P11-05, P11-06    |
+
+**Exit criteria**
+
+- A phantom draft and a multiplayer draft present an identical picking and completion UI.
+- Finishing either draft offers to save the list and build a deck; phantom saves never touch the collection or wallet.
+- The picking phase gives the booster more room; picked cards zoom on hover; a stats panel reflects the pool. CI green.
+
+> **Cross-phase note:** P11-05 adds a `format`/`kind` discriminator to the saved draft record; Phase 12 reads it. Coordinate the schema between P11 and P12 (db agent owns both).
+
+---
+
+## Phase 12 — Draft History & Records
+
+> **Status (2026-06-13):** Not started. Per-task tracking in `PHASE_PROGRESS/PHASE12_PROGRESS.md`.
+
+**Goal:** Register **every** draft (multiplayer and phantom) and let users filter history by type. Implements the surfacing half of **D19**. (Today `/api/history` reads only `SavedDeck`, i.e. multiplayer; the `draftsPlayed` counter likewise undercounts phantom drafts.)
+
+| ID     | Task                                                                                                                                                                | Agent(s)         | Depends on |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------- |
+| P12-01 | Data: ensure phantom drafts produce history records (from P11-05); persist `kind` (`'multiplayer'` \| `'phantom'`) + `difficulty` (phantom) on the saved record + index | db               | P11 done   |
+| P12-02 | History API: merge multiplayer + phantom records, return `kind`, support `?kind=all\|multiplayer\|phantom` (Zod-validated), keep 50-item paging                     | backend          | P12-01     |
+| P12-03 | History UI: type filter (All / Multiplayer / Phantom), per-row kind badge, phantom rows show difficulty; empty states per filter                                    | frontend, design | P12-02     |
+| P12-04 | Detail view handles both kinds (phantom has no co-players — show bots/difficulty instead)                                                                           | frontend         | P12-02     |
+| P12-05 | Security review: users read only their own history; phantom records carry no economy side effects                                                                  | security         | P12-02     |
+| P12-06 | Tests: mixed-history API filter unit/integration, history E2E (filter switch), phantom detail render                                                                | testing          | P12-03     |
+
+**Exit criteria**
+
+- Completed phantom and multiplayer drafts both appear in history; the All/Multiplayer/Phantom filter works; each row is correctly typed; the dashboard X/Y counter agrees with history. CI green.
+
+---
+
+## Phase 13 — Card Library & Set Blocks
+
+> **Status (2026-06-13):** Not started. Independent of P8–P12 (needs only the P1 cache). Per-task tracking in `PHASE_PROGRESS/PHASE13_PROGRESS.md`.
+
+**Goal:** Group expansions into **collapsible block sections** and lay the data foundation for blocks, seeding two real blocks to validate it. Implements **D18**.
+
+| ID     | Task                                                                                                                                                                       | Agent(s)        | Depends on |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------- |
+| P13-01 | Add `block` (id), `blockName`, and ordering fields (`blockOrder`, `setOrderInBlock`) to the `Set` model; backfill existing sets where applicable; index `{ block: 1 }`    | db              | P1 done    |
+| P13-02 | `lib/blocks.ts` registry mapping set code → block (id, name, order) so seeds **and** the sync job set block deterministically                                              | db, api         | P13-01     |
+| P13-03 | Seed new sets — original **Ravnica block** (`rav`, `gpt`, `dis`) + **Urza block** (`usg`, `ulg`, `uds`); **fix the `usa` → `usg` typo** in `scripts/seed-sets.ts`; run `pnpm sync:set --all` to cache them | db, api         | P13-02     |
+| P13-04 | Sets API: `GET /api/sets` returns block-grouped data (or provide a grouping helper); enabled-only still enforced                                                          | backend         | P13-02     |
+| P13-05 | Card Library UI: collapsible block sections (block header + member set tiles) with a "Standalone Sets" section for blockless sets; remember expand/collapse; set click → existing card grid | frontend, design | P13-04     |
+| P13-06 | Graceful partial blocks: blocks whose sets aren't synced yet render as greyed / "coming soon" tiles instead of breaking                                                   | frontend        | P13-05     |
+| P13-07 | Security/etiquette review: new-set sync is cache-first, throttled, identifying UA (no Scryfall etiquette regressions)                                                     | security, api   | P13-03     |
+| P13-08 | Tests: block-grouping API/unit, block-registry unit, library E2E (expand block → open set)                                                                                | testing         | P13-05     |
+
+**Exit criteria**
+
+- The Card Library shows Ravnica and Urza sets grouped under collapsible block headers, with standalone sets separate; new sets are synced cache-first with zero redundant Scryfall calls on warm paths. CI green.
+
+> **Scope note:** blocks are intentionally incomplete (only Ravnica + Urza seeded). This proves the foundation, not full historical coverage.
+
+---
+
+## Phase 14 — Friends & Social
+
+> **Status (2026-06-13):** Not started. Independent vertical. Per-task tracking in `PHASE_PROGRESS/PHASE14_PROGRESS.md`.
+
+**Goal:** A friend system keyed on numeric codes with request/accept, draft-lobby invites, presence/activity, and **read-only** collection & deck viewing. Implements **D17**.
+
+| ID     | Task                                                                                                                                                                                | Agent(s)         | Depends on |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------- |
+| P14-01 | `User.friendCode` (unique numeric, generated on first need) + `Friendship` model (pair, `status: 'pending'\|'accepted'`, requester) with indexes preventing duplicate pairs        | db               | P12 done   |
+| P14-02 | Friends API: send request by code, accept/decline, list friends + pending (in/out), remove friend; Zod-validated; rate-limited                                                     | backend          | P14-01     |
+| P14-03 | Presence: derive online/last-seen from the socket connection + `lastLoginAt`; expose through the friends list                                                                      | backend          | P14-02     |
+| P14-04 | Notifications: friend-request + request-accepted events reuse the `Notification` model + socket push                                                                               | backend          | P14-02     |
+| P14-05 | Friends page UI: your code (copy/share), add-by-code, roster with presence, incoming/outgoing requests, remove                                                                     | frontend, design | P14-02     |
+| P14-06 | Draft invites to friends: invite a friend straight into a lobby from the roster or lobby UI                                                                                         | frontend, backend | P14-05     |
+| P14-07 | Read-only friend views: a friend's collection and decks (read-only, gated by an accepted friendship)                                                                               | backend, frontend | P14-02     |
+| P14-08 | Dashboard friends-activity widget — fills the P8-09 placeholder                                                                                                                    | frontend         | P14-07     |
+| P14-09 | Security review: friendship required for any friend-data read; **no user enumeration by code** (rate-limit + generic errors); can't act on non-friends; collection/deck reads scoped to accepted friends | security         | P14-07     |
+| P14-10 | Tests: request/accept flow unit/integration, code-enumeration rate-limit test, read-only friend-collection E2E, invite-friend-to-draft E2E                                         | testing          | P14-07     |
+
+**Exit criteria**
+
+- Two users can befriend via code, see each other's presence, view each other's collection/decks read-only, and invite each other to drafts. Non-friends can access none of it. CI green.
+
+---
+
+## Phase 15 — Ideas Backlog _(unscheduled — owner sign-off before promotion)_
+
+> **Status (2026-06-13):** Parking lot, not a committed phase. Per-task tracking stub in `PHASE_PROGRESS/PHASE15_PROGRESS.md`. Nothing here is built until the owner promotes it to a real phase.
+
+Ideas surfaced during the expansion. Each is sized roughly and tagged with what it builds on:
+
+| Idea                                  | Builds on        | Notes                                                                                                  |
+| ------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
+| **Trading between friends**           | P14, wallet      | The natural next step after read-only friend views; needs an escrow/confirm flow + audited transfers. |
+| **Sealed pool format**                | booster, P10     | Open 6 packs → build from the pool; reuses the booster generator + deck builder.                       |
+| **Cube support**                      | draft engine     | Custom curated card pools for drafting instead of real sets.                                           |
+| **Deck goldfish / opening-hand sim**  | P10              | Draw 7 + mulligan on a built deck for quick testing.                                                   |
+| **Collection completion meter**       | P13 blocks       | "% of set/block collected" progress bars; nudges toward shop/trades.                                   |
+| **Wishlist completion nudges**        | existing wishlist decks | "You're N cards from finishing this deck" — surface on dashboard/shop.                          |
+| **Post-draft pick insights**          | P9 archetype tags | "Best card in pack" / signal hints on the completion screen.                                          |
+| **Expanded achievements**             | P11, P13, P14    | First friend, first phantom draft, complete a block, etc.                                              |
+| **Extra export/import formats**       | export service   | Arena / Moxfield clipboard formats in addition to text + MTGO.                                         |
+| **Accent theming by colour identity** | P8 theming       | Optional guild/colour accent on top of the wallpaper layer.                                            |
+| **PWA / installable + offline browse**| —                | Service worker for offline collection/library browsing.                                                |
 
 ---
 

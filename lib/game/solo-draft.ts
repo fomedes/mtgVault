@@ -64,7 +64,7 @@ function runBotPicks(
   for (const seat of BOT_SEATS) {
     if (current.pickedThisSlot[seat]) continue;
     const pack = current.currentPacks[seat];
-    if (pack.length === 0) continue;
+    if (pack.length === 0) throw new Error(`bot_empty_pack:seat${seat}`);
 
     const chosen = bot.pick(pack, current.picks[seat], cardMap);
     current = pickCard(current, seat, chosen);

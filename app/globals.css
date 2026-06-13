@@ -84,10 +84,11 @@
 }
 
 .dark {
-  /* Slightly blue-tinted slate so black-bordered MTG cards have visual separation */
-  --background: oklch(0.14 0.018 265);
+  /* Blue-tinted slate, lifted off pure-dark so black-bordered MTG card scans
+     separate from the page (paired with a resting ring on the scan itself). */
+  --background: oklch(0.17 0.022 265);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.195 0.012 265);
+  --card: oklch(0.215 0.014 265);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.195 0.012 265);
   --popover-foreground: oklch(0.985 0 0);

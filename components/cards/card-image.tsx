@@ -49,7 +49,8 @@ export function CardImage({
       draggable={false}
       onError={() => setFailed(true)}
       className={cn(
-        "aspect-5/7 w-full rounded-[4.75%/3.43%] object-cover",
+        // Resting ring separates the card's black frame from the page/wallpaper.
+        "aspect-5/7 w-full rounded-[4.75%/3.43%] object-cover ring-1 ring-black/15 dark:ring-white/12",
         className,
       )}
     />
