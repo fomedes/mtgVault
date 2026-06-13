@@ -16,12 +16,24 @@ export interface BlockGroup {
   id: string;
   name: string;
   order: number;
+  yearRange: string | null;
   sets: SetSummary[];
 }
 
 export interface GroupedSets {
   blocks: BlockGroup[];
   standalone: SetSummary[];
+  standaloneYearRange: string | null;
+}
+
+function computeYearRange(sets: SetSummary[]): string | null {
+  const years = sets
+    .map((s) => (s.releasedAt ? new Date(s.releasedAt).getFullYear() : null))
+    .filter((y): y is number => y !== null);
+  if (years.length === 0) return null;
+  const min = Math.min(...years);
+  const max = Math.max(...years);
+  return min === max ? String(min) : `${min}–${max}`;
 }
 
 export function groupSetsByBlock(sets: SetSummary[]): GroupedSets {
@@ -41,6 +53,7 @@ export function groupSetsByBlock(sets: SetSummary[]): GroupedSets {
         id: set.block,
         name: set.blockName,
         order: set.blockOrder,
+        yearRange: null,
         sets: [set],
       });
     }
@@ -48,14 +61,18 @@ export function groupSetsByBlock(sets: SetSummary[]): GroupedSets {
 
   for (const block of blockMap.values()) {
     block.sets.sort((a, b) => a.setOrderInBlock - b.setOrderInBlock);
+    block.yearRange = computeYearRange(block.sets);
   }
 
-  const blocks = Array.from(blockMap.values()).sort((a, b) => a.order - b.order);
+  // Newest block first (descending order value)
+  const blocks = Array.from(blockMap.values()).sort((a, b) => b.order - a.order);
+
+  // Standalone already arrives sorted newest-first from the DB query; re-sort defensively
   standalone.sort((a, b) => {
     const aDate = a.releasedAt ? new Date(a.releasedAt).getTime() : 0;
     const bDate = b.releasedAt ? new Date(b.releasedAt).getTime() : 0;
     return bDate - aDate;
   });
 
-  return { blocks, standalone };
+  return { blocks, standalone, standaloneYearRange: computeYearRange(standalone) };
 }

@@ -3,13 +3,26 @@ import "@/lib/load-env";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import { CardSet } from "@/lib/models/CardSet";
+import { scryfall } from "@/lib/mtg-api/client";
 import { getBlockEntry } from "@/lib/blocks";
+import type { ScryfallList, ScryfallSet } from "@/lib/mtg-api/types";
 
 /**
- * Initial curated draftable sets (D2), confirmed by the owner 2026-06-11.
- * Expand via the admin UI (Phase 3) — never a code change.
+ * Set types that have draft/booster formats.
+ * Excludes commander, token, promo, digital-only, un-sets, etc.
  */
-const CURATED_SET_CODES = [
+const DRAFTABLE_TYPES = new Set([
+  "expansion",
+  "core",
+  "draft_innovation",
+  "masters",
+]);
+
+/**
+ * Sets enabled for drafting by default. Admins can toggle more via the UI.
+ * All other seeded sets default to enabled: false.
+ */
+const ENABLED_SET_CODES = new Set([
   "ktk", // Khans of Tarkir
   "dom", // Dominaria
   "mh2", // Modern Horizons 2
@@ -30,25 +43,63 @@ const CURATED_SET_CODES = [
   "rav", // Ravnica: City of Guilds
   "gpt", // Guildpact
   "dis", // Dissension
-];
+]);
 
 async function main() {
   await connectToDatabase();
-  for (const code of CURATED_SET_CODES) {
+
+  console.log("Fetching set list from Scryfall...");
+  const { data: allSets } = await scryfall.request<ScryfallList<ScryfallSet>>("/sets");
+
+  const draftable = allSets.filter(
+    (s) => DRAFTABLE_TYPES.has(s.set_type) && !s.digital,
+  );
+  console.log(
+    `Found ${draftable.length} draftable sets out of ${allSets.length} total. Upserting...`,
+  );
+
+  let upserted = 0;
+  for (const set of draftable) {
+    const code = set.code.toLowerCase();
     const blockEntry = getBlockEntry(code);
     const blockFields = blockEntry
-      ? { block: blockEntry.id, blockName: blockEntry.name, blockOrder: blockEntry.order, setOrderInBlock: blockEntry.setOrder }
+      ? {
+          block: blockEntry.id,
+          blockName: blockEntry.name,
+          blockOrder: blockEntry.order,
+          setOrderInBlock: blockEntry.setOrder,
+        }
       : { block: "", blockName: "", blockOrder: 0, setOrderInBlock: 0 };
+
     await CardSet.updateOne(
       { code },
-      { $set: { enabled: true, ...blockFields } },
+      {
+        $set: {
+          name: set.name,
+          scryfallId: set.id,
+          setType: set.set_type,
+          cardCount: set.card_count,
+          releasedAt: set.released_at ? new Date(set.released_at) : undefined,
+          iconSvgUri: set.icon_svg_uri ?? "",
+          ...blockFields,
+        },
+        // Only set enabled on insert; existing state (admin-configured) is preserved.
+        $setOnInsert: { enabled: false },
+      },
       { upsert: true },
     );
+    upserted++;
   }
-  await CardSet.updateOne({ code: "usa" }, { $set: { enabled: false } });
-  const enabled = await CardSet.countDocuments({ enabled: true });
+
+  // Ensure curated sets are enabled regardless of prior state.
+  await CardSet.updateMany(
+    { code: { $in: Array.from(ENABLED_SET_CODES) } },
+    { $set: { enabled: true } },
+  );
+
+  const enabledCount = await CardSet.countDocuments({ enabled: true });
   console.log(
-    `Seeded ${CURATED_SET_CODES.length} curated sets (${enabled} enabled total). Run "pnpm sync:set --all" to fetch card data.`,
+    `Seeded ${upserted} draftable sets (${enabledCount} enabled). Run "pnpm sync:set --all" to fetch card data.`,
   );
   await mongoose.disconnect();
 }

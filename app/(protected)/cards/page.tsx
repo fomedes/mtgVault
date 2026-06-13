@@ -46,7 +46,7 @@ export default async function CardsPage() {
         </p>
       </header>
 
-      <SetLibrary blocks={grouped.blocks} standalone={grouped.standalone} />
+      <SetLibrary blocks={grouped.blocks} standalone={grouped.standalone} standaloneYearRange={grouped.standaloneYearRange} />
     </main>
   );
 }

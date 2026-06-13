@@ -7,6 +7,7 @@ import type { BlockGroup, SetSummary } from "@/lib/sets-grouping";
 
 interface CollapsibleSectionProps {
   title: string;
+  subtitle?: string;
   storageKey: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
@@ -30,14 +31,14 @@ function useCollapseState(key: string, defaultOpen: boolean) {
   return [open, toggle] as const;
 }
 
-function CollapsibleSection({ title, storageKey, children, defaultOpen = true }: CollapsibleSectionProps) {
+function CollapsibleSection({ title, subtitle, storageKey, children, defaultOpen = true }: CollapsibleSectionProps) {
   const [open, toggle] = useCollapseState(storageKey, defaultOpen);
   return (
     <section>
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-2 py-2 text-left font-semibold tracking-tight transition-colors hover:opacity-80"
+        className="flex w-full items-center gap-2 py-2 text-left transition-colors hover:opacity-80"
         aria-expanded={open}
       >
         {open ? (
@@ -45,7 +46,10 @@ function CollapsibleSection({ title, storageKey, children, defaultOpen = true }:
         ) : (
           <ChevronRightIcon className="size-4 shrink-0" />
         )}
-        {title}
+        <span className="font-semibold tracking-tight">{title}</span>
+        {subtitle && (
+          <span className="text-muted-foreground text-sm font-normal">{subtitle}</span>
+        )}
       </button>
       {open ? children : null}
     </section>
@@ -101,9 +105,10 @@ function SetTile({ set }: { set: SetSummary }) {
 export interface SetLibraryProps {
   blocks: BlockGroup[];
   standalone: SetSummary[];
+  standaloneYearRange?: string | null;
 }
 
-export function SetLibrary({ blocks, standalone }: SetLibraryProps) {
+export function SetLibrary({ blocks, standalone, standaloneYearRange }: SetLibraryProps) {
   if (blocks.length === 0 && standalone.length === 0) {
     return (
       <div className="bg-card rounded-lg border p-8 text-center">
@@ -118,23 +123,10 @@ export function SetLibrary({ blocks, standalone }: SetLibraryProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {blocks.map((block) => (
-        <CollapsibleSection
-          key={block.id}
-          title={block.name}
-          storageKey={`set-block-open:${block.id}`}
-        >
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {block.sets.map((set) => (
-              <SetTile key={set.code} set={set} />
-            ))}
-          </div>
-        </CollapsibleSection>
-      ))}
-
       {standalone.length > 0 && (
         <CollapsibleSection
-          title="Standalone Sets"
+          title="Recent Sets"
+          subtitle={standaloneYearRange ?? undefined}
           storageKey="set-block-open:standalone"
         >
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -144,6 +136,21 @@ export function SetLibrary({ blocks, standalone }: SetLibraryProps) {
           </div>
         </CollapsibleSection>
       )}
+
+      {blocks.map((block) => (
+        <CollapsibleSection
+          key={block.id}
+          title={block.name}
+          subtitle={block.yearRange ?? undefined}
+          storageKey={`set-block-open:${block.id}`}
+        >
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {block.sets.map((set) => (
+              <SetTile key={set.code} set={set} />
+            ))}
+          </div>
+        </CollapsibleSection>
+      ))}
     </div>
   );
 }
