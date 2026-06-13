@@ -2,28 +2,31 @@ import { NextResponse } from "next/server";
 import { guardApiRequest } from "@/lib/auth/api-guard";
 import { connectToDatabase } from "@/lib/db";
 import { CardSet } from "@/lib/models/CardSet";
+import { groupSetsByBlock, type SetSummary } from "@/lib/sets-grouping";
 
 export async function GET() {
   const guard = await guardApiRequest("sets");
   if (!guard.ok) return guard.response;
 
   await connectToDatabase();
-  // Only enabled sets whose metadata has actually been synced are browsable.
-  const sets = await CardSet.find({
-    enabled: true,
-    cachedAt: { $exists: true },
-  })
+  // Return all enabled sets — unsynced sets appear as "coming soon" tiles (P13-06).
+  const sets = await CardSet.find({ enabled: true })
     .sort({ releasedAt: -1 })
     .lean();
 
-  return NextResponse.json({
-    sets: sets.map((set) => ({
-      code: set.code,
-      name: set.name,
-      setType: set.setType,
-      cardCount: set.cardCount,
-      releasedAt: set.releasedAt ?? null,
-      iconSvgUri: set.iconSvgUri,
-    })),
-  });
+  const summaries: SetSummary[] = sets.map((set) => ({
+    code: set.code,
+    name: set.name,
+    setType: set.setType,
+    cardCount: set.cardCount,
+    releasedAt: set.releasedAt ? set.releasedAt.toISOString() : null,
+    iconSvgUri: set.iconSvgUri,
+    synced: !!set.cachedAt,
+    block: set.block ?? "",
+    blockName: set.blockName ?? "",
+    blockOrder: set.blockOrder ?? 0,
+    setOrderInBlock: set.setOrderInBlock ?? 0,
+  }));
+
+  return NextResponse.json(groupSetsByBlock(summaries));
 }

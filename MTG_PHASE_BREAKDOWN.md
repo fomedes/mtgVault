@@ -399,7 +399,7 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 13 — Card Library & Set Blocks
 
-> **Status (2026-06-13):** Not started. Independent of P8–P12 (needs only the P1 cache). Per-task tracking in `PHASE_PROGRESS/PHASE13_PROGRESS.md`.
+> **Status (2026-06-13):** COMPLETE. typecheck clean · 298 tests pass (22 new). Per-task tracking in PHASE_PROGRESS/PHASE13_PROGRESS.md.
 
 **Goal:** Group expansions into **collapsible block sections** and lay the data foundation for blocks, seeding two real blocks to validate it. Implements **D18**.
 

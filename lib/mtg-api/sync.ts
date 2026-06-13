@@ -3,6 +3,7 @@ import { scryfall, type ScryfallClient } from "@/lib/mtg-api/client";
 import { toCardDocument, toSetDocument } from "@/lib/mtg-api/transform";
 import { Card } from "@/lib/models/Card";
 import { CardSet } from "@/lib/models/CardSet";
+import { getBlockEntry } from "@/lib/blocks";
 
 export const SET_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export const CARD_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -67,10 +68,14 @@ export async function syncSet(
       `[sync:${setCode}] set metadata cache miss (${ageLabel(existing?.cachedAt, startedAt)}) — fetching`,
     );
     const scrySet = await client.getSet(setCode);
+    const blockEntry = getBlockEntry(setCode);
+    const blockFields = blockEntry
+      ? { block: blockEntry.id, blockName: blockEntry.name, blockOrder: blockEntry.order, setOrderInBlock: blockEntry.setOrder }
+      : {};
     await CardSet.updateOne(
       { code: setCode },
       {
-        $set: toSetDocument(scrySet, now()),
+        $set: { ...toSetDocument(scrySet, now()), ...blockFields },
         $setOnInsert: { enabled: false },
       },
       { upsert: true },

@@ -3,6 +3,7 @@ import "@/lib/load-env";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import { CardSet } from "@/lib/models/CardSet";
+import { getBlockEntry } from "@/lib/blocks";
 
 /**
  * Initial curated draftable sets (D2), confirmed by the owner 2026-06-11.
@@ -23,18 +24,28 @@ const CURATED_SET_CODES = [
   "dsk", // Duskmourn: House of Horror
   "rtr", // Return to Ravnica
   "ons", // Onslaught
-  "usa", // Urza's Saga
+  "usg", // Urza's Saga
+  "ulg", // Urza's Legacy
+  "uds", // Urza's Destiny
+  "rav", // Ravnica: City of Guilds
+  "gpt", // Guildpact
+  "dis", // Dissension
 ];
 
 async function main() {
   await connectToDatabase();
   for (const code of CURATED_SET_CODES) {
+    const blockEntry = getBlockEntry(code);
+    const blockFields = blockEntry
+      ? { block: blockEntry.id, blockName: blockEntry.name, blockOrder: blockEntry.order, setOrderInBlock: blockEntry.setOrder }
+      : { block: "", blockName: "", blockOrder: 0, setOrderInBlock: 0 };
     await CardSet.updateOne(
       { code },
-      { $set: { enabled: true } },
+      { $set: { enabled: true, ...blockFields } },
       { upsert: true },
     );
   }
+  await CardSet.updateOne({ code: "usa" }, { $set: { enabled: false } });
   const enabled = await CardSet.countDocuments({ enabled: true });
   console.log(
     `Seeded ${CURATED_SET_CODES.length} curated sets (${enabled} enabled total). Run "pnpm sync:set --all" to fetch card data.`,

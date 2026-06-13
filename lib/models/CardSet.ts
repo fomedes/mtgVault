@@ -24,7 +24,13 @@ const cardSetSchema = new Schema({
   boosterPrice: { type: Number, default: 100, min: 0 },
   cachedAt: { type: Date },
   cardsSyncedAt: { type: Date },
+  block: { type: String, default: "" },
+  blockName: { type: String, default: "" },
+  blockOrder: { type: Number, default: 0 },
+  setOrderInBlock: { type: Number, default: 0 },
 });
+
+cardSetSchema.index({ block: 1 });
 
 export type CardSetDoc = InferSchemaType<typeof cardSetSchema>;
 

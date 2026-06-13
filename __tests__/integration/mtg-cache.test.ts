@@ -285,11 +285,13 @@ describe("getRulingsForCard", () => {
 });
 
 describe("GET /api/sets", () => {
-  it("returns only enabled, synced sets", async () => {
+  it("returns enabled sets grouped under standalone when no block assigned", async () => {
     const response = await getSets();
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { sets: Array<{ code: string }> };
-    expect(body.sets.map((set) => set.code)).toEqual(["tst"]);
+    const body = (await response.json()) as { blocks: unknown[]; standalone: Array<{ code: string; synced: boolean }> };
+    // tst has no block, so it lands in standalone; it is synced (cachedAt set by earlier test)
+    expect(body.standalone.map((s) => s.code)).toContain("tst");
+    expect(body.standalone.find((s) => s.code === "tst")?.synced).toBe(true);
   });
 
   it("rejects unauthenticated callers", async () => {
