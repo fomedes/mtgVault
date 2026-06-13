@@ -2,44 +2,56 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
-import { useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CardImage } from "@/components/cards/card-image";
 import { cardZoom, cardZoomReduced } from "@/lib/animations/card";
-import type { CardListItemDto } from "@/lib/api/card-dto";
 
 const PREVIEW_WIDTH = 240;
 const PREVIEW_HEIGHT = 336; // ~5:7 aspect
-const OFFSET = 12; // gap from the anchor edge
+const OFFSET = 12;
 
 function computePosition(anchor: DOMRect): { top: number; left: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-
-  // Prefer right of anchor; fall back to left if it would clip.
   let left = anchor.right + OFFSET;
   if (left + PREVIEW_WIDTH > vw - 8) {
     left = anchor.left - PREVIEW_WIDTH - OFFSET;
   }
   if (left < 8) left = 8;
-
-  // Vertically centre on the anchor; clamp to viewport.
   let top = anchor.top + anchor.height / 2 - PREVIEW_HEIGHT / 2;
   top = Math.max(8, Math.min(top, vh - PREVIEW_HEIGHT - 8));
-
   return { top, left };
 }
 
 /**
- * Portal-based card zoom preview (P9-02). Renders nothing until a card is
- * supplied. Viewport-aware: prefers the right of the anchor, flips left when
- * there's no room. Respects `prefers-reduced-motion` (instant appear/hide).
+ * Minimal card shape the preview portal needs. Both `CardListItemDto` and
+ * `DeckCardDto` satisfy this — lets any card surface opt in without coupling
+ * to a specific DTO.
+ */
+export interface Previewable {
+  scryfallId: string;
+  name: string;
+  manaCost?: string;
+  typeLine?: string;
+  colorIdentity?: string[];
+  imageUris?: { small?: string; normal?: string; large?: string };
+  cardFaces?: {
+    manaCost?: string;
+    typeLine?: string;
+    imageUris?: { small?: string; normal?: string; large?: string };
+  }[];
+}
+
+/**
+ * Portal-based card zoom preview (P9-02, extended in P10-05). Renders nothing
+ * until a card is supplied. Viewport-aware positioning. Respects
+ * `prefers-reduced-motion`.
  */
 export function CardPreview({
   card,
   anchorRect,
 }: {
-  card: CardListItemDto | null;
+  card: Previewable | null;
   anchorRect: DOMRect | null;
 }) {
   const reduced = useReducedMotion();
@@ -58,9 +70,9 @@ export function CardPreview({
   }
 
   const image = card
-    ? (card.imageUris ?? card.cardFaces[0]?.imageUris)
+    ? (card.imageUris ?? card.cardFaces?.[0]?.imageUris)
     : null;
-  const face = card?.cardFaces[0];
+  const face = card?.cardFaces?.[0];
 
   const content = (
     <AnimatePresence>
@@ -72,7 +84,7 @@ export function CardPreview({
           animate="visible"
           exit="exit"
           role="tooltip"
-          aria-label={card ? `Preview: ${card.name}` : undefined}
+          aria-label={`Preview: ${card.name}`}
           style={{
             position: "fixed",
             top: posRef.current.top,
@@ -97,5 +109,4 @@ export function CardPreview({
   return createPortal(content, document.body);
 }
 
-// Named re-export so consumers can import the reduced variant directly.
 export { cardZoom, cardZoomReduced };

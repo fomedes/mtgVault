@@ -1,4 +1,5 @@
 import { CardImage } from "@/components/cards/card-image";
+import { useCardPreviewContext } from "@/components/cards/card-preview-provider";
 import { isBasicLand, type DeckCardDto } from "@/lib/api/deck-dto";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ interface DeckCardRowProps {
 }
 
 export function DeckCardRow({ card, onAdd, onRemove, readonly }: DeckCardRowProps) {
+  const { previewHandlers } = useCardPreviewContext();
   const isBasic = isBasicLand(card.typeLine);
   const fullyOwned = isBasic || card.ownedQty >= card.quantity;
   const partiallyOwned = !isBasic && card.ownedQty > 0 && card.ownedQty < card.quantity;
@@ -24,6 +26,7 @@ export function DeckCardRow({ card, onAdd, onRemove, readonly }: DeckCardRowProp
 
   return (
     <div
+      {...previewHandlers(card)}
       className={cn(
         "flex items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-muted/30",
         notOwned && "opacity-50",

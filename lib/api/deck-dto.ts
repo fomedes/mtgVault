@@ -13,6 +13,7 @@ export interface DeckCardDto {
   colors: string[];
   colorIdentity: string[];
   rarity: string;
+  cmc: number;
   imageUris?: { small?: string; normal?: string };
   quantity: number;
   /** Quantity the user currently owns (null = not yet resolved). */
@@ -46,6 +47,7 @@ export function deckCardToDto(
     colors: entry.colors,
     colorIdentity: entry.colorIdentity,
     rarity: entry.rarity,
+    cmc: entry.cmc ?? 0,
     imageUris: entry.imageUris
       ? {
           small: entry.imageUris.small ?? undefined,

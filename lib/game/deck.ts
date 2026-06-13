@@ -14,6 +14,7 @@ type CardSeedEntry = {
   colors: string[];
   colorIdentity: string[];
   rarity: string;
+  cmc: number;
   imageUris?: { small?: string | null; normal?: string | null };
   quantity: number;
 };
@@ -140,6 +141,7 @@ export async function createDeck(
         colors: c.colors,
         colorIdentity: c.colorIdentity,
         rarity: c.rarity,
+        cmc: c.cmc,
         imageUris: c.imageUris
           ? { small: c.imageUris.small, normal: c.imageUris.normal }
           : undefined,
@@ -198,6 +200,7 @@ export async function patchDeck(
           colors: cardDoc.colors,
           colorIdentity: cardDoc.colorIdentity,
           rarity: cardDoc.rarity,
+          cmc: cardDoc.cmc,
           imageUris: cardDoc.imageUris
             ? { small: cardDoc.imageUris.small, normal: cardDoc.imageUris.normal }
             : undefined,

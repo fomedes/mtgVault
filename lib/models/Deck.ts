@@ -20,6 +20,7 @@ const deckCardSchema = new Schema(
     colors: { type: [String], default: [] },
     colorIdentity: { type: [String], default: [] },
     rarity: { type: String, default: "common" },
+    cmc: { type: Number, default: 0 },
     imageUris: {
       small: { type: String },
       normal: { type: String },

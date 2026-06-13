@@ -327,7 +327,7 @@ Agent workflow inside every phase (overview §6.2):
 
 ## Phase 10 — Deck Builder Overhaul
 
-> **Status (2026-06-13):** Not started. Per-task tracking in `PHASE_PROGRESS/PHASE10_PROGRESS.md`.
+> **Status (2026-06-13):** **COMPLETE.** All tasks shipped. 234/234 tests pass, typecheck clean. Per-task tracking in `PHASE_PROGRESS/PHASE10_PROGRESS.md`.
 
 **Goal:** Bring the deck builder up to spec — comprehensive stats, a corrected curve, a type-grouped / CMC-sorted list, an advanced filter overlay on the card source, and hover-zoom on miniatures. Builds on Phase 6 and consumes Phase 9.
 

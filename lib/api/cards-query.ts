@@ -37,14 +37,36 @@ const typeTermSchema = z
   .max(40)
   .regex(/^[a-z' -]+$/i, "letters, spaces, hyphens and apostrophes only");
 
+/** Comma-separated set codes, max 20 entries. */
+const setsListSchema = z
+  .string()
+  .transform((v) =>
+    v
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  .pipe(
+    z
+      .array(z.string().regex(/^[a-z0-9]{2,6}$/))
+      .min(1)
+      .max(20),
+  );
+
+/** Numeric power/toughness value: 0–20. */
+const ptValueSchema = z.coerce.number().int().min(0).max(20);
+
 export const cardListQuerySchema = z
   .object({
+    /** Single set code (card browser). */
     set: z
       .string()
       .trim()
       .toLowerCase()
       .regex(/^[a-z0-9]{2,6}$/)
       .optional(),
+    /** Comma-separated set codes (deck builder advanced filter). */
+    sets: setsListSchema.optional(),
     name: z.string().trim().min(1).max(80).optional(),
     colors: z
       .string()
@@ -63,6 +85,15 @@ export const cardListQuerySchema = z
       .optional(),
     cmcMin: z.coerce.number().int().min(0).max(30).optional(),
     cmcMax: z.coerce.number().int().min(0).max(30).optional(),
+    /** Power numeric value (0–20). */
+    power: ptValueSchema.optional(),
+    /** "eq" = exact match (default), "gte" = at least N. */
+    powerOp: z.enum(["eq", "gte"]).default("eq"),
+    /** Toughness numeric value (0–20). */
+    toughness: ptValueSchema.optional(),
+    toughnessOp: z.enum(["eq", "gte"]).default("eq"),
+    /** When true, the route filters to cards the authenticated user owns. */
+    ownedOnly: z.coerce.boolean().default(false),
     page: z.coerce.number().int().min(1).max(1000).default(1),
     pageSize: z.coerce.number().int().min(6).max(100).default(60),
     sort: z.enum(["collector", "name", "cmc", "rarity"]).default("collector"),
@@ -82,12 +113,22 @@ export function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function buildCardFilter(query: CardListQuery): CardFilter {
+export function buildCardFilter(
+  query: CardListQuery,
+  /** MongoDB ObjectId strings for cards the user owns (for ownedOnly filter). */
+  ownedCardIds?: string[],
+): CardFilter {
   // Built loosely typed (dynamic `legalities.<format>` keys defeat the strict
   // filter type), cast once on return; every value is whitelisted or escaped.
   const filter: Record<string, unknown> = {};
 
-  if (query.set) filter.set = query.set;
+  // `sets` (multi) takes priority over singular `set`.
+  if (query.sets && query.sets.length > 0) {
+    filter.set = { $in: query.sets };
+  } else if (query.set) {
+    filter.set = query.set;
+  }
+
   if (query.name) {
     filter.name = { $regex: escapeRegExp(query.name), $options: "i" };
   }
@@ -124,6 +165,35 @@ export function buildCardFilter(query: CardListQuery): CardFilter {
     if (query.cmcMin !== undefined) cmc.$gte = query.cmcMin;
     if (query.cmcMax !== undefined) cmc.$lte = query.cmcMax;
     filter.cmc = cmc;
+  }
+
+  // Power / toughness — numeric comparison via $expr/$toDouble so "*" strings
+  // never match numeric predicates; non-numeric fields evaluate to null → false.
+  if (query.power !== undefined) {
+    if (query.powerOp === "gte") {
+      filter.$expr = {
+        ...(filter.$expr as object | undefined),
+        $gte: [{ $toDouble: { $ifNull: ["$power", "-1"] } }, query.power],
+      };
+    } else {
+      filter.power = String(query.power);
+    }
+  }
+  if (query.toughness !== undefined) {
+    if (query.toughnessOp === "gte") {
+      const existing = filter.$expr as Record<string, unknown> | undefined;
+      // Merge toughness into existing $expr if power already set one.
+      filter.$expr = existing
+        ? { $and: [existing, { $gte: [{ $toDouble: { $ifNull: ["$toughness", "-1"] } }, query.toughness] }] }
+        : { $gte: [{ $toDouble: { $ifNull: ["$toughness", "-1"] } }, query.toughness] };
+    } else {
+      filter.toughness = String(query.toughness);
+    }
+  }
+
+  // ownedOnly: caller resolves the user's card ObjectIds server-side.
+  if (query.ownedOnly && ownedCardIds) {
+    filter._id = { $in: ownedCardIds };
   }
 
   return filter as CardFilter;
