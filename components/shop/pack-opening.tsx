@@ -46,18 +46,18 @@ function PackVisual({
 
   return (
     <div className="flex flex-col items-center gap-8">
-      {/* Glow behind pack */}
       <div className="relative">
+        {/* Ambient glow */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-52 w-36 rounded-full bg-violet-600/25 blur-3xl" />
+          <div className="h-64 w-44 rounded-full bg-indigo-700/20 blur-3xl" />
         </div>
 
-        {/* Floating wrapper */}
+        {/* Float animation */}
         <motion.div
           animate={reduce ? {} : { y: [0, -7, 0] }}
           transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
         >
-          {/* Click / hover wrapper */}
+          {/* Hover / tap wrapper */}
           <motion.div
             onClick={onOpen}
             whileHover={reduce ? {} : { y: -4, scale: 1.03 }}
@@ -65,25 +65,55 @@ function PackVisual({
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="relative cursor-pointer select-none"
           >
-            {/* Pack body — 488 × 296 px (h-122 w-74) */}
-            <div className="relative h-122 w-74 overflow-hidden rounded-xl shadow-2xl shadow-black/60">
+            {/*
+              PACK BODY — 488 × 296 px (h-122 w-74)
+              ┌─ 0px   TOP CRIMP — heat seal ridges (40px) ─┐
+              ├─ 40px  HEADER — card count + MTG logo (96px)─┤
+              ├─ 136px ART WINDOW (240px) ──────────────────┤
+              ├─ 376px SET NAME BANNER (36px) ──────────────┤
+              ├─ 412px PACK TYPE / INFO (40px) ─────────────┤
+              └─ 452px BOTTOM CRIMP — heat seal ridges (36px)┘
+                 488px
+            */}
+            <div className="relative h-122 w-74 overflow-hidden rounded-xl shadow-[0_24px_64px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.06)]">
 
-              {/* Layer 1 — metallic base */}
-              <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900" />
+              {/* Base — dark navy, slightly warm centre */}
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0c111a] via-[#131c2e] to-[#0c111a]" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_55%,rgba(30,58,138,0.18),transparent_70%)]" />
 
-              {/* Layer 2 — MTG logo (top 136 px, above art window) */}
-              <div className="absolute inset-x-0 top-0 flex h-34 items-center justify-center px-6">
+              {/* Side depth — gives the pack a physical thickness feel */}
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/60 to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-black/60 to-transparent" />
+
+              {/* ── TOP CRIMP (0–40px) ──────────────────────────── */}
+              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+                {[5, 9, 13, 17, 21, 26, 30, 34].map((y) => (
+                  <div
+                    key={y}
+                    style={{ top: y }}
+                    className="absolute inset-x-2.5 h-px bg-white/[0.07]"
+                  />
+                ))}
+                {/* Bottom edge of crimp — bright line to simulate pressed seal */}
+                <div className="absolute inset-x-0 bottom-0 h-px bg-white/20" />
+              </div>
+
+              {/* ── HEADER: card count + logo (40–136px) ─────────── */}
+              <div className="absolute inset-x-0 top-10 flex h-24 flex-col items-center justify-center gap-2 px-6">
+                <p className="text-[8px] font-semibold tracking-[0.35em] text-white/30 uppercase">
+                  {cardCount} Cards
+                </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/magic_logo.webp"
                   alt="Magic: The Gathering"
                   draggable={false}
-                  className="max-h-24 w-auto object-contain"
+                  className="max-h-14 w-auto object-contain drop-shadow-[0_0_16px_rgba(196,181,253,0.5)]"
                 />
               </div>
 
-              {/* Layer 3 — art window (136–376 px) */}
-              <div className="absolute inset-x-2.5 top-34 h-[240px] overflow-hidden rounded-sm">
+              {/* ── ART WINDOW (136–376px) ──────────────────────── */}
+              <div className="absolute inset-x-1 top-34 h-[240px] overflow-hidden">
                 {artUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -93,60 +123,86 @@ function PackVisual({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-900">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_40%_40%,rgba(196,181,253,0.3),transparent_70%)]" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-violet-700 via-purple-900 to-indigo-950">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_55%_at_38%_35%,rgba(196,181,253,0.25),transparent_70%)]" />
                   </div>
                 )}
-                {/* Vignette — blends art bottom into banner */}
-                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent" />
+                {/* Top vignette — art fades into header */}
+                <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-black/55 to-transparent" />
+                {/* Bottom vignette — art fades into set name */}
+                <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/80 to-transparent" />
               </div>
 
-              {/* Layer 4 — set name banner (376–410 px) */}
-              <div className="absolute inset-x-0 top-[376px] flex h-[34px] items-center justify-center bg-black/55">
-                <span className="text-[14px] font-bold tracking-[0.22em] text-white/75 uppercase">
+              {/* ── SET NAME BANNER (376–412px) ─────────────────── */}
+              <div className="absolute inset-x-0 top-[376px] flex h-[36px] items-center justify-center bg-black/65 backdrop-blur-[2px]">
+                <span className="text-[14px] font-black tracking-[0.2em] text-white/90 uppercase drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
                   {setCode}
                 </span>
               </div>
 
-              {/* Layer 5 — pack / card count info (410 px → bottom) */}
-              <div className="absolute inset-x-2.5 top-[410px] bottom-6 flex flex-col items-center justify-center gap-1.5">
-                <div className="flex gap-1.5">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-px w-8 rounded-full bg-white/10" />
-                  ))}
-                </div>
-                <p className="text-[13px] font-medium text-white/40">
-                  {packCount === 1
-                    ? "1 Booster Pack"
-                    : `${packCount} Booster Packs`}
-                  {" · "}
-                  {cardCount} Cards
-                </p>
-                <div className="flex gap-1.5">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-px w-8 rounded-full bg-white/10" />
-                  ))}
+              {/* ── PACK TYPE / INFO (412–452px) ────────────────── */}
+              <div className="absolute inset-x-0 top-[412px] flex h-[40px] items-center justify-center bg-black/30">
+                <div className="flex items-center gap-3">
+                  <div className="h-px w-8 bg-white/15" />
+                  <p className="text-[10px] font-bold tracking-[0.28em] text-white/40 uppercase">
+                    Play Booster{packCount > 1 ? ` ×${packCount}` : ""}
+                  </p>
+                  <div className="h-px w-8 bg-white/15" />
                 </div>
               </div>
 
-              {/* Foil shimmer sweep */}
+              {/* ── BOTTOM CRIMP (452–488px) ────────────────────── */}
+              <div className="absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                {/* Top edge of crimp */}
+                <div className="absolute inset-x-0 top-0 h-px bg-white/20" />
+                {[6, 11, 16, 21, 26, 30].map((y) => (
+                  <div
+                    key={y}
+                    style={{ top: y }}
+                    className="absolute inset-x-2.5 h-px bg-white/[0.07]"
+                  />
+                ))}
+              </div>
+
+              {/* White foil shimmer sweep */}
               {!reduce && (
                 <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-xl">
                   <motion.div
-                    className="-skew-x-12 absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/18 to-transparent"
-                    animate={{ x: [-80, 296] }}
+                    className="-skew-x-12 absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-white/16 to-transparent"
+                    animate={{ x: [-64, 310] }}
                     transition={{
-                      duration: 1.6,
+                      duration: 1.8,
                       repeat: Infinity,
-                      repeatDelay: 2.8,
+                      repeatDelay: 3.2,
                       ease: "easeInOut",
                     }}
                   />
                 </div>
               )}
 
-              {/* Edge ring */}
-              <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-white/10" />
+              {/* Rainbow foil shimmer (offset, subtle) */}
+              {!reduce && (
+                <div className="pointer-events-none absolute inset-0 z-[19] overflow-hidden rounded-xl">
+                  <motion.div
+                    className="-skew-x-12 absolute inset-y-0 w-24"
+                    style={{
+                      background:
+                        "linear-gradient(to right, transparent, rgba(255,100,100,0.04), rgba(255,220,80,0.04), rgba(100,210,100,0.04), rgba(80,150,255,0.05), rgba(190,110,255,0.04), transparent)",
+                    }}
+                    animate={{ x: [-96, 310] }}
+                    transition={{
+                      duration: 2.4,
+                      repeat: Infinity,
+                      repeatDelay: 2.8,
+                      delay: 1.0,
+                      ease: "easeInOut",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Outer ring */}
+              <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-white/[0.09]" />
             </div>
           </motion.div>
         </motion.div>
