@@ -1,13 +1,13 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { XIcon } from "lucide-react";
-import { useState } from "react";
 import { CardImage } from "@/components/cards/card-image";
 import { usePackAnimations } from "@/lib/animations/pack";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 
 const RARE_RARITIES = new Set(["rare", "mythic"]);
 
@@ -65,13 +65,25 @@ function PackVisual({
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="relative cursor-pointer select-none"
           >
-            {/* Pack body */}
-            <div className="relative h-64 w-44 overflow-hidden rounded-xl shadow-2xl shadow-black/60">
-              {/* Metallic base */}
+            {/* Pack body — 488 × 296 px (h-122 w-74) */}
+            <div className="relative h-122 w-74 overflow-hidden rounded-xl shadow-2xl shadow-black/60">
+
+              {/* Layer 1 — metallic base */}
               <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900" />
 
-              {/* Art window */}
-              <div className="absolute inset-x-2.5 top-7 h-[140px] overflow-hidden rounded-sm">
+              {/* Layer 2 — MTG logo (top 136 px, above art window) */}
+              <div className="absolute inset-x-0 top-0 flex h-34 items-center justify-center px-6">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/magic_logo.webp"
+                  alt="Magic: The Gathering"
+                  draggable={false}
+                  className="max-h-24 w-auto object-contain"
+                />
+              </div>
+
+              {/* Layer 3 — art window (136–376 px) */}
+              <div className="absolute inset-x-2.5 top-34 h-[240px] overflow-hidden rounded-sm">
                 {artUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -85,33 +97,25 @@ function PackVisual({
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_40%_40%,rgba(196,181,253,0.3),transparent_70%)]" />
                   </div>
                 )}
-                {/* Vignette at base of art to blend into banner */}
+                {/* Vignette — blends art bottom into banner */}
                 <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-slate-900/80 to-transparent" />
               </div>
 
-              {/* Top crimp */}
-              <div className="absolute inset-x-0 top-0 z-10 flex h-7 flex-col items-center justify-center gap-1 bg-gradient-to-b from-black/70 to-transparent">
-                <div className="flex gap-2">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="h-px w-7 rounded-full bg-white/15"
-                    />
-                  ))}
-                </div>
-                <div className="h-px w-32 rounded-full bg-white/8" />
-              </div>
-
-              {/* Set name banner */}
-              <div className="absolute inset-x-0 top-[183px] flex h-6 items-center justify-center bg-black/55">
-                <span className="text-[9px] font-bold tracking-[0.22em] text-white/75 uppercase">
+              {/* Layer 4 — set name banner (376–410 px) */}
+              <div className="absolute inset-x-0 top-[376px] flex h-[34px] items-center justify-center bg-black/55">
+                <span className="text-[14px] font-bold tracking-[0.22em] text-white/75 uppercase">
                   {setCode}
                 </span>
               </div>
 
-              {/* Card count info */}
-              <div className="absolute inset-x-2.5 top-[209px] bottom-7 flex flex-col items-center justify-center gap-1">
-                <p className="text-[8px] font-medium text-white/40">
+              {/* Layer 5 — pack / card count info (410 px → bottom) */}
+              <div className="absolute inset-x-2.5 top-[410px] bottom-6 flex flex-col items-center justify-center gap-1.5">
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-px w-8 rounded-full bg-white/10" />
+                  ))}
+                </div>
+                <p className="text-[13px] font-medium text-white/40">
                   {packCount === 1
                     ? "1 Booster Pack"
                     : `${packCount} Booster Packs`}
@@ -125,25 +129,12 @@ function PackVisual({
                 </div>
               </div>
 
-              {/* Bottom crimp */}
-              <div className="absolute inset-x-0 bottom-0 z-10 flex h-7 flex-col items-center justify-center gap-1 bg-gradient-to-t from-black/70 to-transparent">
-                <div className="h-px w-32 rounded-full bg-white/8" />
-                <div className="flex gap-2">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="h-px w-7 rounded-full bg-white/15"
-                    />
-                  ))}
-                </div>
-              </div>
-
               {/* Foil shimmer sweep */}
               {!reduce && (
                 <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-xl">
                   <motion.div
                     className="-skew-x-12 absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/18 to-transparent"
-                    animate={{ x: [-80, 256] }}
+                    animate={{ x: [-80, 296] }}
                     transition={{
                       duration: 1.6,
                       repeat: Infinity,
