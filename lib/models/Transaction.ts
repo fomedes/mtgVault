@@ -10,6 +10,7 @@ export const TRANSACTION_REASONS = [
   "daily_bonus",
   "first_time_bonus",
   "shop_purchase",
+  "shop_refund",
   "draft_reward",
   "achievement",
   "admin_grant",

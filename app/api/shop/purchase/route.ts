@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import { awardAchievement } from "@/lib/game/achievements";
 import { generateBoosters } from "@/lib/game/booster";
 import { addCards } from "@/lib/game/collection";
-import { debitWallet, InsufficientFundsError } from "@/lib/game/wallet";
+import { creditWallet, debitWallet, InsufficientFundsError } from "@/lib/game/wallet";
 import { Card } from "@/lib/models/Card";
 import { CardSet } from "@/lib/models/CardSet";
 import { toCardListItem } from "@/lib/api/card-dto";
@@ -61,6 +61,13 @@ export async function POST(request: Request) {
   const priceEach = cardSet.boosterPrice ?? 100;
   const totalCost = priceEach * quantity;
 
+  // Validate booster pool before spending coins — some sets (e.g. UB crossovers
+  // sold as precons) have inBooster=false on every card and cannot produce packs.
+  const boosterCount = await Card.countDocuments({ set: setCode, inBooster: true });
+  if (boosterCount === 0) {
+    return NextResponse.json({ error: "set_not_available" }, { status: 404 });
+  }
+
   // Guarded debit — throws InsufficientFundsError if balance is too low.
   let newBalance: number;
   try {
@@ -77,12 +84,22 @@ export async function POST(request: Request) {
     throw err;
   }
 
-  // Generate packs and ingest cards.
-  const { cardIds } = await generateBoosters(setCode, quantity);
-  await addCards(guard.user.uid, cardIds, "shop");
+  // Generate packs and ingest cards. On unexpected failure, refund the debit
+  // so the user's balance stays correct.
+  let cardIds: import("mongoose").Types.ObjectId[];
+  try {
+    ({ cardIds } = await generateBoosters(setCode, quantity));
+    await addCards(guard.user.uid, cardIds, "shop");
+  } catch (err) {
+    await creditWallet(guard.user.uid, totalCost, "shop_refund", {
+      setCode,
+      packCount: quantity,
+    });
+    throw err;
+  }
 
   // Resolve card details for the opening animation.
-  const cardDocs = await Card.find({ _id: { $in: cardIds } }).lean();
+  const cardDocs = await Card.find({ _id: { $in: cardIds! } }).lean();
   const cardMap = new Map(cardDocs.map((c) => [c._id.toString(), c]));
   const cards = cardIds.map((id) => {
     const doc = cardMap.get(id.toString());
