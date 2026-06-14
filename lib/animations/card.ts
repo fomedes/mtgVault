@@ -11,7 +11,8 @@ export const cardHover: Variants = {
   rest: { y: 0, scale: 1 },
   hover: {
     y: -4,
-    scale: 1.02,
+    zIndex: 1,
+    scale: 1.2,
     transition: { type: "spring", stiffness: 400, damping: 25 },
   },
   tap: { scale: 0.97 },

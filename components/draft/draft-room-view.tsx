@@ -8,7 +8,6 @@ import { PoolStats } from "@/components/draft/pool-stats";
 import { TimerRing } from "@/components/draft/timer-ring";
 import type { PlayerView } from "@/lib/game/draft";
 import type { CardListItemDto } from "@/lib/api/card-dto";
-import { cn } from "@/lib/utils";
 
 interface DraftRoomViewProps {
   currentPack: string[];
@@ -78,9 +77,8 @@ export function DraftRoomView({
           </div>
         </div>
 
-        {/* Main content row */}
+        {/* Main content row — pack grid takes all available width */}
         <div className="flex gap-6">
-          {/* Pack grid — takes all available width */}
           <PackGrid
             cardIds={currentPack}
             cardCache={cardCache}
@@ -88,45 +86,30 @@ export function DraftRoomView({
             disabled={!needsPick || (picking ?? false)}
           />
 
-          {/* Sidebar: player rail (MP) + stats (when picks exist) */}
-          <aside
-            className={cn(
-              "hidden lg:block shrink-0 space-y-4",
-              players ? "w-56" : "w-48",
-            )}
-          >
-            {players && players.length > 0 && (
+          {/* Sidebar: player rail only (MP) */}
+          {players && players.length > 0 && (
+            <aside className="hidden lg:block shrink-0 w-56">
               <PlayerRail players={players} mySeat={mySeat} />
-            )}
-            {myPicks.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                  Pool Stats
-                </p>
-                <PoolStats cardIds={myPicks} cardCache={cardCache} variant="compact" />
-              </div>
-            )}
-          </aside>
+            </aside>
+          )}
         </div>
 
-        {/* Mobile: collapsible pool stats */}
+        {/* Stats + picks row */}
         {myPicks.length > 0 && (
-          <details className="lg:hidden">
-            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
-              Pool Stats ({myPicks.length} cards)
-            </summary>
-            <div className="pt-2">
+          <div className="flex flex-wrap gap-6 pt-2 border-t border-border/50">
+            <div className="space-y-2 shrink-0">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                Pool Stats
+              </p>
               <PoolStats cardIds={myPicks} cardCache={cardCache} variant="compact" />
             </div>
-          </details>
+            <PickedTray
+              cardIds={myPicks}
+              cardCache={cardCache}
+              className="flex-1 min-w-0"
+            />
+          </div>
         )}
-
-        {/* Picks tray — full width at bottom */}
-        <PickedTray
-          cardIds={myPicks}
-          cardCache={cardCache}
-          className="pt-2 border-t border-border/50"
-        />
       </div>
     </CardPreviewProvider>
   );

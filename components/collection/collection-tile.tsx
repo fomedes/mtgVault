@@ -2,7 +2,6 @@
 
 import { motion } from "motion/react";
 import { CardImage } from "@/components/cards/card-image";
-import { useCardPreviewContext } from "@/components/cards/card-preview-provider";
 import { useCardAnimations } from "@/lib/animations/card";
 import { useCollectionAnimations } from "@/lib/animations/collection";
 import type { CollectionEntryDto } from "@/lib/api/collection-dto";
@@ -28,7 +27,6 @@ export function CollectionTile({
 }) {
   const { cardHover } = useCardAnimations();
   const { cardEnterCollection, collectionShine } = useCollectionAnimations();
-  const { previewHandlers } = useCardPreviewContext();
   const { card } = entry;
   const image = card.imageUris ?? card.cardFaces[0]?.imageUris;
   const face = card.cardFaces[0];
@@ -47,7 +45,6 @@ export function CollectionTile({
         whileHover="hover"
         whileTap="tap"
         onClick={onClick}
-        {...previewHandlers(card)}
         aria-label={`${card.name}, ${card.rarity}, quantity ${entry.quantity}`}
         className={cn(
           "relative w-full cursor-pointer rounded-[4.75%/3.43%] ring-0 outline-none hover:ring-2 focus-visible:ring-2 overflow-hidden",

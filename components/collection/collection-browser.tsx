@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
 import { CardFilterBar } from "@/components/cards/card-filter-bar";
 import { CardGrid, CardGridSkeleton } from "@/components/cards/card-grid";
-import { CardPreviewProvider } from "@/components/cards/card-preview-provider";
 import {
   DEFAULT_FILTERS,
   type CardFilterState,
@@ -231,7 +230,6 @@ export function CollectionBrowser() {
     );
 
   return (
-    <CardPreviewProvider>
     <div className="flex flex-col gap-6">
       <header className="space-y-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -340,6 +338,5 @@ export function CollectionBrowser() {
         onClose={() => setSelectedId(null)}
       />
     </div>
-    </CardPreviewProvider>
   );
 }

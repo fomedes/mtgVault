@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
 import { CardFilterBar } from "@/components/cards/card-filter-bar";
 import { CardGrid, CardGridSkeleton } from "@/components/cards/card-grid";
-import { CardPreviewProvider } from "@/components/cards/card-preview-provider";
 import { CardTile } from "@/components/cards/card-tile";
 import {
   filtersFromSearchParams,
@@ -19,17 +18,17 @@ import { useInfiniteCards } from "@/hooks/use-infinite-cards";
 
 const NAME_DEBOUNCE_MS = 300;
 
-function useOwnedIds(): Set<string> {
-  const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
+function useOwnedCounts(): Map<string, number> {
+  const [ownedCounts, setOwnedCounts] = useState<Map<string, number>>(new Map());
   useEffect(() => {
     fetch("/api/collection/ids")
-      .then((res) => (res.ok ? res.json() : { scryfallIds: [] }))
-      .then((data: { scryfallIds: string[] }) =>
-        setOwnedIds(new Set(data.scryfallIds)),
+      .then((res) => (res.ok ? res.json() : { quantities: {} }))
+      .then((data: { quantities: Record<string, number> }) =>
+        setOwnedCounts(new Map(Object.entries(data.quantities))),
       )
       .catch(() => undefined);
   }, []);
-  return ownedIds;
+  return ownedCounts;
 }
 
 export function CardBrowser({
@@ -75,7 +74,7 @@ export function CardBrowser({
     useInfiniteCards(apiQuery);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const ownedIds = useOwnedIds();
+  const ownedCounts = useOwnedCounts();
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -92,7 +91,6 @@ export function CardBrowser({
   }, [loadMore]);
 
   return (
-    <CardPreviewProvider>
     <div className="flex flex-col gap-5">
       <header className="space-y-1">
         <Link
@@ -129,7 +127,7 @@ export function CardBrowser({
             <CardTile
               key={card.scryfallId}
               card={card}
-              owned={ownedIds.has(card.scryfallId)}
+              ownedCount={ownedCounts.get(card.scryfallId) ?? 0}
               onClick={() => setSelectedId(card.scryfallId)}
             />
           ))}
@@ -156,6 +154,5 @@ export function CardBrowser({
         onClose={() => setSelectedId(null)}
       />
     </div>
-    </CardPreviewProvider>
   );
 }

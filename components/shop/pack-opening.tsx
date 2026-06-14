@@ -95,20 +95,20 @@ function PackVisual({
                   />
                 ))}
                 {/* Bottom edge of crimp — bright line to simulate pressed seal */}
-                <div className="absolute inset-x-0 bottom-0 h-px bg-white/20" />
+                <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
               </div>
 
               {/* ── HEADER: card count + logo (40–136px) ─────────── */}
-              <div className="absolute inset-x-0 top-10 flex h-24 flex-col items-center justify-center gap-2 px-6">
-                <p className="text-[8px] font-semibold tracking-[0.35em] text-white/30 uppercase">
+              <div className="absolute inset-x-0 top-10 flex h-32 flex-col justify-center px-5">
+                <p className="self-start text-[12px] font-semibold tracking-[0.35em] text-white uppercase">
                   {cardCount} Cards
                 </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/magic_logo.webp"
+                  src="/mtg_logo_old.webp"
                   alt="Magic: The Gathering"
                   draggable={false}
-                  className="max-h-14 w-auto object-contain drop-shadow-[0_0_16px_rgba(196,181,253,0.5)]"
+                  className="-mt-6 h-24 w-auto object-contain"
                 />
               </div>
 
@@ -154,7 +154,7 @@ function PackVisual({
               {/* ── BOTTOM CRIMP (452–488px) ────────────────────── */}
               <div className="absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
                 {/* Top edge of crimp */}
-                <div className="absolute inset-x-0 top-0 h-px bg-white/20" />
+                <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
                 {[6, 11, 16, 21, 26, 30].map((y) => (
                   <div
                     key={y}
@@ -301,18 +301,23 @@ export function PackOpening({
                   <motion.div
                     key={`${card.scryfallId}-${i}`}
                     variants={cardReveal}
-                    className={cn(
-                      "relative overflow-hidden rounded-[4.75%/3.43%]",
-                      isRare ? (RARITY_GLOW_CLASS[card.rarity] ?? "") : "",
-                    )}
                   >
-                    <CardImage
-                      name={card.name}
-                      imageUrl={image?.normal ?? image?.small}
-                      manaCost={card.manaCost || face?.manaCost}
-                      typeLine={card.typeLine || face?.typeLine}
-                      colorIdentity={card.colorIdentity}
-                    />
+                    <motion.div
+                      whileHover={{ scale: 1.12, zIndex: 10 }}
+                      transition={{ type: "spring", stiffness: 350, damping: 22 }}
+                      className={cn(
+                        "relative overflow-hidden rounded-[4.75%/3.43%]",
+                        isRare ? (RARITY_GLOW_CLASS[card.rarity] ?? "") : "",
+                      )}
+                    >
+                      <CardImage
+                        name={card.name}
+                        imageUrl={image?.normal ?? image?.small}
+                        manaCost={card.manaCost || face?.manaCost}
+                        typeLine={card.typeLine || face?.typeLine}
+                        colorIdentity={card.colorIdentity}
+                      />
+                    </motion.div>
                   </motion.div>
                 );
               })}

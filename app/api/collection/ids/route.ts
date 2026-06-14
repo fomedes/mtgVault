@@ -4,7 +4,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Card } from "@/lib/models/Card";
 import { UserCollection } from "@/lib/models/UserCollection";
 
-/** Returns the Scryfall IDs of every card the user owns, for owned-badge display. */
+/** Returns a scryfallId → quantity map for every card the user owns. */
 export async function GET() {
   const guard = await guardApiRequest("collection-ids");
   if (!guard.ok) return guard.response;
@@ -13,12 +13,16 @@ export async function GET() {
 
   const collection = await UserCollection.findOne(
     { userId: guard.user.uid },
-    { "cards.cardId": 1 },
+    { "cards.cardId": 1, "cards.quantity": 1 },
   ).lean();
 
   if (!collection || collection.cards.length === 0) {
-    return NextResponse.json({ scryfallIds: [] });
+    return NextResponse.json({ quantities: {} });
   }
+
+  const qtyByCardId = new Map(
+    collection.cards.map((e) => [e.cardId.toString(), e.quantity]),
+  );
 
   const cardObjectIds = collection.cards.map((e) => e.cardId);
   const cards = await Card.find(
@@ -26,7 +30,10 @@ export async function GET() {
     { scryfallId: 1 },
   ).lean();
 
-  return NextResponse.json({
-    scryfallIds: cards.map((c) => c.scryfallId),
-  });
+  const quantities: Record<string, number> = {};
+  for (const card of cards) {
+    quantities[card.scryfallId] = qtyByCardId.get(card._id.toString()) ?? 1;
+  }
+
+  return NextResponse.json({ quantities });
 }
