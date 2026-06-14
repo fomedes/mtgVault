@@ -5,14 +5,13 @@ export function parseManaSymbols(manaCost: string): string[] {
   return Array.from(manaCost.matchAll(/\{([^}]+)\}/g), (match) => match[1]);
 }
 
-const SYMBOL_CLASSES: Record<string, string> = {
-  W: "bg-mana-white text-neutral-900",
-  U: "bg-mana-blue text-white",
-  B: "bg-mana-black text-white",
-  R: "bg-mana-red text-white",
-  G: "bg-mana-green text-white",
-  C: "bg-mana-colorless text-neutral-900",
-};
+/** Converts a Scryfall symbol code to its local SVG filename (no extension). */
+export function symbolToFilename(symbol: string): string {
+  return symbol
+    .replace(/\//g, "")
+    .replace("½", "HALF")
+    .replace("∞", "INFINITY");
+}
 
 export function ManaCost({
   cost,
@@ -29,17 +28,16 @@ export function ManaCost({
       aria-label={`Mana cost ${cost}`}
     >
       {symbols.map((symbol, index) => (
-        <span
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           key={`${symbol}-${index}`}
+          src={`/mana_symbols/${symbolToFilename(symbol)}.svg`}
+          alt={symbol}
           aria-hidden
-          className={cn(
-            "flex size-4 items-center justify-center rounded-full text-[0.55rem] leading-none font-bold",
-            // Hybrid/Phyrexian/generic symbols fall back to colorless styling.
-            SYMBOL_CLASSES[symbol] ?? SYMBOL_CLASSES.C,
-          )}
-        >
-          {symbol}
-        </span>
+          className="inline-block size-4"
+          width={16}
+          height={16}
+        />
       ))}
     </span>
   );

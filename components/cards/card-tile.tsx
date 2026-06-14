@@ -1,10 +1,10 @@
 "use client";
 
-import { motion } from "motion/react";
 import { CardImage } from "@/components/cards/card-image";
 import { useCardAnimations } from "@/lib/animations/card";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 const RARITY_RING: Record<string, string> = {
   common: "hover:ring-rarity-common focus-visible:ring-rarity-common",
@@ -60,7 +60,7 @@ export function CardTile({
 
       {ownedCount > 0 && (
         <span
-          className="pointer-events-none absolute right-1.5 bottom-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-black/70 px-1 text-[10px] font-bold text-white"
+          className="pointer-events-none absolute right-1.5 bottom-1.5 flex h-5 min-w-5 items-center justify-center rounded-sm bg-white/80 px-1 text-[14px] font-bold text-black"
           aria-hidden
         >
           ×{ownedCount}

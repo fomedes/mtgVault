@@ -77,12 +77,12 @@ function filtersToParams(filters: SourceFilterState): URLSearchParams {
 
 const CARD_TYPES = ["Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land", "Battle"];
 const COLORS = [
-  { code: "W", label: "W", title: "White", bg: "bg-mana-white" },
-  { code: "U", label: "U", title: "Blue", bg: "bg-mana-blue" },
-  { code: "B", label: "B", title: "Black", bg: "bg-mana-black" },
-  { code: "R", label: "R", title: "Red", bg: "bg-mana-red" },
-  { code: "G", label: "G", title: "Green", bg: "bg-mana-green" },
-  { code: "C", label: "C", title: "Colorless", bg: "bg-mana-colorless" },
+  { code: "W", title: "White" },
+  { code: "U", title: "Blue" },
+  { code: "B", title: "Black" },
+  { code: "R", title: "Red" },
+  { code: "G", title: "Green" },
+  { code: "C", title: "Colorless" },
 ];
 const RARITIES = ["common", "uncommon", "rare", "mythic"];
 
@@ -242,21 +242,21 @@ function FilterDialog({
           <div className="space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Colour</p>
             <div className="flex gap-2">
-              {COLORS.map(({ code, label, title, bg }) => (
+              {COLORS.map(({ code, title }) => (
                 <button
                   key={code}
                   type="button"
                   title={title}
                   onClick={() => toggleColor(code)}
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-bold transition-all",
-                    bg,
+                    "h-7 w-7 rounded-full border-2 p-0 transition-all",
                     draft.colors.includes(code)
                       ? "border-white/80 scale-110 shadow-md"
                       : "border-transparent opacity-50 hover:opacity-80",
                   )}
                 >
-                  {label}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/mana_symbols/${code}.svg`} alt={title} className="size-full rounded-full" />
                 </button>
               ))}
             </div>

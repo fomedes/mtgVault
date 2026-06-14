@@ -10,12 +10,12 @@ import {
 import { cn } from "@/lib/utils";
 
 const COLOR_OPTIONS = [
-  { key: "W", label: "White", className: "bg-mana-white" },
-  { key: "U", label: "Blue", className: "bg-mana-blue" },
-  { key: "B", label: "Black", className: "bg-mana-black" },
-  { key: "R", label: "Red", className: "bg-mana-red" },
-  { key: "G", label: "Green", className: "bg-mana-green" },
-  { key: "C", label: "Colorless", className: "bg-mana-colorless" },
+  { key: "W", label: "White" },
+  { key: "U", label: "Blue" },
+  { key: "B", label: "Black" },
+  { key: "R", label: "Red" },
+  { key: "G", label: "Green" },
+  { key: "C", label: "Colorless" },
 ];
 
 const RARITY_OPTIONS = [
@@ -100,13 +100,19 @@ export function CardFilterBar({
                 patch({ colors: toggleValue(filters.colors, color.key) })
               }
               className={cn(
-                "size-7 cursor-pointer rounded-full border-2 transition-all",
-                color.className,
+                "size-7 cursor-pointer rounded-full border-2 p-0 transition-all",
                 filters.colors.includes(color.key)
                   ? "border-foreground scale-110"
                   : "border-transparent opacity-40 hover:opacity-80",
               )}
-            />
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/mana_symbols/${color.key}.svg`}
+                alt=""
+                className="size-full rounded-full"
+              />
+            </button>
           ))}
         </div>
 

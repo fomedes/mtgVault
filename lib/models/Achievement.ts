@@ -7,10 +7,30 @@ import {
 } from "mongoose";
 
 export const ACHIEVEMENT_IDS = [
+  // Bronze
+  "first_card",
   "first_purchase",
   "first_draft",
+  "first_login",
+  "coins_500",
+  "night_owl",
+  // Silver
   "collection_100",
+  "hat_drafter",
+  "draft_10",
+  "spent_1000",
+  "login_7",
+  "social_butterfly",
+  // Gold
   "collection_500",
+  "draft_3_0",
+  "coins_5000",
+  "login_30",
+  "rainbow_collector",
+  // Platinum
+  "collection_1000",
+  "draft_50",
+  "coins_10000",
 ] as const;
 
 export type AchievementId = (typeof ACHIEVEMENT_IDS)[number];

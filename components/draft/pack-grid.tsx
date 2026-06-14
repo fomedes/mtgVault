@@ -1,10 +1,10 @@
 "use client";
 
-import { motion } from "motion/react";
 import { CardImage } from "@/components/cards/card-image";
 import { useDraftAnimations } from "@/lib/animations/draft";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 const RARITY_RING: Record<string, string> = {
   common: "hover:ring-rarity-common focus-visible:ring-rarity-common",
@@ -31,7 +31,7 @@ export function PackGrid({
       variants={packGrid}
       initial="hidden"
       animate="visible"
-      className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
+      className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-5"
     >
       {cardIds.map((id, i) => {
         const card = cardCache.get(id);

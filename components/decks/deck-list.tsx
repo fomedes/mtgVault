@@ -13,23 +13,18 @@ const CATEGORY_STYLE: Record<string, { label: string; className: string }> = {
   wishlist: { label: "Wishlist", className: "bg-amber-500/20 text-amber-300" },
 };
 
-const COLOR_DOT: Record<string, string> = {
-  W: "bg-mana-white",
-  U: "bg-mana-blue",
-  B: "bg-mana-black",
-  R: "bg-mana-red",
-  G: "bg-mana-green",
-};
-
 function ColorPips({ colors }: { colors: string[] }) {
   if (colors.length === 0) return <span className="text-muted-foreground text-xs">Colorless</span>;
   return (
     <div className="flex items-center gap-1">
       {colors.map((c) => (
-        <span
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           key={c}
-          className={cn("h-3 w-3 rounded-full border border-black/30", COLOR_DOT[c] ?? "bg-muted")}
+          src={`/mana_symbols/${c}.svg`}
+          alt={c}
           title={c}
+          className="h-4 w-4"
         />
       ))}
     </div>

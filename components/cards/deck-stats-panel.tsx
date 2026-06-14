@@ -3,15 +3,6 @@
 import { cn } from "@/lib/utils";
 import type { DeckStatsResult } from "@/lib/game/deck-stats";
 
-const COLOR_DOT: Record<string, string> = {
-  W: "bg-mana-white",
-  U: "bg-mana-blue",
-  B: "bg-mana-black",
-  R: "bg-mana-red",
-  G: "bg-mana-green",
-  C: "bg-mana-colorless",
-};
-
 const COLOR_ORDER = ["W", "U", "B", "R", "G", "C"] as const;
 
 const RARITY_COLOR: Record<string, string> = {
@@ -61,7 +52,8 @@ function ColorBar({ colors }: { colors: DeckStatsResult["colors"] }) {
       <div className="flex flex-wrap gap-1.5">
         {present.map((c) => (
           <div key={c} className="flex items-center gap-1">
-            <span className={cn("h-3 w-3 rounded-full border border-black/30 flex-shrink-0", COLOR_DOT[c])} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/mana_symbols/${c}.svg`} alt={c} className="h-4 w-4 flex-shrink-0" />
             <span className="text-xs tabular-nums">{colors[c]}</span>
           </div>
         ))}
