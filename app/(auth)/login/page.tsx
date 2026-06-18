@@ -4,19 +4,28 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { createGoogleProvider, getFirebaseAuth } from "@/lib/firebase/client";
+import {
+  createGoogleProvider,
+  createMicrosoftProvider,
+  getFirebaseAuth,
+} from "@/lib/firebase/client";
 
 type Status = "idle" | "signing-in" | "not-allowlisted" | "error";
+type Provider = "google" | "microsoft";
 
 export default function LoginPage() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
+  const [activeProvider, setActiveProvider] = useState<Provider | null>(null);
 
-  async function handleSignIn() {
+  async function handleSignIn(provider: Provider) {
     setStatus("signing-in");
+    setActiveProvider(provider);
     const auth = getFirebaseAuth();
+    const authProvider =
+      provider === "google" ? createGoogleProvider() : createMicrosoftProvider();
     try {
-      const credential = await signInWithPopup(auth, createGoogleProvider());
+      const credential = await signInWithPopup(auth, authProvider);
       const idToken = await credential.user.getIdToken();
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -33,8 +42,12 @@ export default function LoginPage() {
       setStatus(response.status === 403 ? "not-allowlisted" : "error");
     } catch {
       setStatus("error");
+    } finally {
+      setActiveProvider(null);
     }
   }
+
+  const signingIn = status === "signing-in";
 
   return (
     <main className="flex min-h-svh flex-1 flex-col items-center justify-center gap-8 px-4">
@@ -42,22 +55,37 @@ export default function LoginPage() {
         <h1 className="text-4xl font-bold tracking-tight">MTG Vault</h1>
         <p className="text-muted-foreground max-w-sm text-sm">
           Private draft &amp; collection vault. Invite-only — sign in with an
-          approved Google account.
+          approved account.
         </p>
       </div>
 
-      <Button
-        size="lg"
-        onClick={handleSignIn}
-        disabled={status === "signing-in"}
-      >
-        {status === "signing-in" ? "Signing in…" : "Sign in with Google"}
-      </Button>
+      <div className="flex flex-col gap-3 w-full max-w-xs">
+        <Button
+          size="lg"
+          onClick={() => handleSignIn("google")}
+          disabled={signingIn}
+        >
+          {signingIn && activeProvider === "google"
+            ? "Signing in…"
+            : "Sign in with Google"}
+        </Button>
+
+        <Button
+          size="lg"
+          variant="outline"
+          onClick={() => handleSignIn("microsoft")}
+          disabled={signingIn}
+        >
+          {signingIn && activeProvider === "microsoft"
+            ? "Signing in…"
+            : "Sign in with Microsoft"}
+        </Button>
+      </div>
 
       {status === "not-allowlisted" && (
         <p className="text-destructive max-w-sm text-center text-sm">
-          You&apos;re not on the list. Ask the vault keeper to add your Google
-          account, then try again.
+          You&apos;re not on the list. Ask the vault keeper to add your account
+          email, then try again.
         </p>
       )}
       {status === "error" && (

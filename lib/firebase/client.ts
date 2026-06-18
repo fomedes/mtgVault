@@ -1,5 +1,10 @@
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { GoogleAuthProvider, getAuth, type Auth } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  OAuthProvider,
+  getAuth,
+  type Auth,
+} from "firebase/auth";
 
 /**
  * Lazy init: nothing touches Firebase until the user clicks sign-in, so
@@ -22,4 +27,10 @@ export function getFirebaseAuth(): Auth {
 
 export function createGoogleProvider(): GoogleAuthProvider {
   return new GoogleAuthProvider();
+}
+
+export function createMicrosoftProvider(): OAuthProvider {
+  const provider = new OAuthProvider("microsoft.com");
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
 }
