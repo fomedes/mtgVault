@@ -35,27 +35,27 @@ function getAdminApp(): App {
   });
 }
 
-async function ensureE2EUser(): Promise<string> {
+async function ensureE2EUser(targetUid: string, email: string): Promise<string> {
   const auth = getAuth(getAdminApp());
   try {
-    return (await auth.getUser(E2E_UID)).uid;
+    return (await auth.getUser(targetUid)).uid;
   } catch {
     try {
       return (
         await auth.createUser({
-          uid: E2E_UID,
-          email: E2E_EMAIL,
+          uid: targetUid,
+          email,
           emailVerified: true,
         })
       ).uid;
     } catch {
       // Email already taken by a previous run with a different uid.
-      return (await auth.getUserByEmail(E2E_EMAIL)).uid;
+      return (await auth.getUserByEmail(email)).uid;
     }
   }
 }
 
-async function ensureAllowlisted(): Promise<void> {
+async function ensureAllowlisted(email: string): Promise<void> {
   const conn = await mongoose
     .createConnection(process.env.MONGODB_URI!, { dbName: "mtg-vault" })
     .asPromise();
@@ -63,8 +63,8 @@ async function ensureAllowlisted(): Promise<void> {
     await conn
       .collection("allowlistentries")
       .updateOne(
-        { email: E2E_EMAIL },
-        { $set: { email: E2E_EMAIL, role: "user", addedBy: "e2e" } },
+        { email },
+        { $set: { email, role: "user", addedBy: "e2e" } },
         { upsert: true },
       );
   } finally {
@@ -76,8 +76,19 @@ export async function createE2ESessionCookie(): Promise<{
   name: string;
   value: string;
 }> {
-  const uid = await ensureE2EUser();
-  await ensureAllowlisted();
+  return createE2ESessionCookieFor(E2E_UID, E2E_EMAIL);
+}
+
+/**
+ * Mints a session cookie for an arbitrary E2E account. Multiplayer specs use
+ * this to seat two distinct players in separate browser contexts.
+ */
+export async function createE2ESessionCookieFor(
+  targetUid: string,
+  email: string,
+): Promise<{ name: string; value: string }> {
+  const uid = await ensureE2EUser(targetUid, email);
+  await ensureAllowlisted(email);
 
   const customToken = await getAuth(getAdminApp()).createCustomToken(uid);
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;

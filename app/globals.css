@@ -139,6 +139,12 @@
   }
 }
 
+/* Shared form-control style (text inputs, selects, textareas) — used by the
+   play lobby and other lightweight forms. Mirrors the draft lobby's inline look. */
+@utility input {
+  @apply border-input bg-background w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50;
+}
+
 /* MTG design tokens — rarity accents and colour identity (overview §9, agent-design). */
 @theme {
   --color-rarity-common: oklch(0.85 0.005 260);

@@ -8,6 +8,7 @@ export const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Home" },
   { href: "/draft", label: "Multiplayer Draft" },
   { href: "/solo-draft", label: "Phantom Draft" },
+  { href: "/play", label: "Play" },
   { href: "/shop", label: "Shop" },
   { href: "/collection", label: "My Collection" },
   { href: "/decks", label: "Decks" },

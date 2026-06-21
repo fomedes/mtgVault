@@ -9,6 +9,7 @@ import {
 export const NOTIFICATION_TYPES = [
   "draft_invite",
   "draft_started",
+  "play_invite",
   "friend_request",
   "friend_accepted",
 ] as const;
