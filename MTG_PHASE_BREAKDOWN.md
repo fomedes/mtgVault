@@ -39,6 +39,17 @@ The owner reviewed Phases 0–7 and commissioned a second wave of work (navigati
 | D18 | **Set blocks**            | Add a `block` field to `Set`; the Card Library groups sets under **collapsible block sections** (standalone sets in their own section). Seed the original **Ravnica block** (`rav`, `gpt`, `dis`) and **Urza block** (`usg`, `ulg`, `uds`) to prove grouping; **correct the `usa` → `usg` set-code typo** in the seed. Blocks are intentionally incomplete for now — foundation only.    |
 | D19 | **Phantom drafts in history** | Phantom (solo) draft completions are recorded as **read-only pick lists** (no collection ingest, no VC) so they appear in **Draft History** and can seed the Deck Builder. History is filterable **All / Multiplayer / Phantom**, and the dashboard counter splits accordingly.                                                                                                    |
 
+### Phase 16 decisions (Live Multiplayer Play, confirmed with the owner 2026-06-21)
+
+The owner commissioned a real-time, manual "virtual tabletop" so the group can actually play the decks they build. These decisions scope Phase 16:
+
+| #   | Decision                | Resolution                                                                                                                                                                                                                                                                                                                  |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D20 | **Board model**         | Ordered-list zones (hand, library, graveyard, exile, command) **+** a shared free 2D **battlefield** where each card carries `x/y/z`, `tapped`, `faceDown`, `flipped`, `counters`. Library order is server-held and hidden; a hand is private to its owner. The engine enforces **no game rules** — it only syncs a leakage-safe board. |
+| D21 | **Deck source**         | Import from a saved **`Deck`** doc **and** from a pasted **Arena/MTGO decklist**, validated against the cached `Card` collection via a pure parser. Unmatched names are reported back as `unknownCards[]`.                                                                                                                  |
+| D22 | **Player count**        | Full **2–4** from the start, including a **2v2 team mode** with optional shared/team life. The lobby configures player count, format label, starting life, and life mode.                                                                                                                                                   |
+| D23 | **Compliance deferred** | Artist credit + WotC Fan Content disclaimer are an explicit **deferred follow-up** (tracked in `PHASE16_PROGRESS.md`), out of scope for Phase 16, to be completed before any wider exposure of full card art.                                                                                                              |
+
 ---
 
 ## 1. Phase Dependency Graph
@@ -444,6 +455,39 @@ Agent workflow inside every phase (overview §6.2):
 **Exit criteria**
 
 - Two users can befriend via code, see each other's presence, view each other's collection/decks read-only, and invite each other to drafts. Non-friends can access none of it. CI green.
+
+---
+
+## Phase 16 — Live Multiplayer Play (Virtual Tabletop)
+
+> **Status (2026-06-21):** Implemented (typecheck + Phase-16 lint clean; production build compiles `/play`; 40 pure unit/leakage/decklist tests pass locally; DB/socket/E2E suites run in CI). Per-task tracking in `PHASE_PROGRESS/PHASE16_PROGRESS.md`. End-of-phase security pass pending. Implements **D20–D23**.
+
+**Goal:** A real-time, shared-board "virtual tabletop" for 2–4 players to import a deck and play a **manual** game — the server syncs the board and moves cards on command but enforces **no game rules** (no stack, triggers, or state-based actions). Built as a parallel `play:*` suite mirroring the draft infrastructure, leaving the security-reviewed draft path untouched. The pure engine + parser are built and exhaustively unit-tested before any socket wiring.
+
+| ID     | Task                                                                                                                                                                  | Agent(s)          | Depends on   |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------ |
+| P16-01 | Pure engine `lib/game/play.ts` (zero I/O): `BoardState`/`BoardAction`/`applyAction`/`getPlayerView`/`createBoard`/`seatForUid`; instance-id per copy; seeded PRNG; `actorSeat` server-injected | backend           | P14 done     |
+| P16-02 | Pure decklist parser `lib/game/decklist.ts` (`4`/`4x`/`(SET) num`, headers/comments)                                                                                  | backend           | —            |
+| P16-03 | `lib/models/PlaySession.ts` (mirrors `DraftSession`; `Mixed` board checkpoint; 3 indexes)                                                                             | db                | —            |
+| P16-04 | Import bridge `lib/game/play-import.ts`: `resolveDeckLibrary` (ownership) + `resolveDecklistLibrary` (case-insensitive, DFC faces, `unknownCards[]`, ≤250 cap)         | backend           | P16-02, P16-03 |
+| P16-05 | Server suite `server/play/{state,schemas,lobby,events,reconnect,notifications}.ts` — separate `shortCodeIndex` + `playlobby:*` prefix; **all payloads Zod-validated**; per-socket `getPlayerView` broadcast; no turn timer | backend, security | P16-01, P16-04 |
+| P16-06 | Register in `server/index.ts` + `handlePlayDisconnect`                                                                                                                | backend           | P16-05       |
+| P16-07 | `store/play-store.ts` + `hooks/use-play-socket.ts` (reuse `getSocket()`; optimistic move + version reconcile)                                                         | frontend          | P16-05       |
+| P16-08 | `lib/animations/play.ts` (`tapRotate`/`cardEnterZone`/`battlefieldDrag`, `useReducedMotion`)                                                                          | design            | —            |
+| P16-09 | Route `app/(protected)/play/` + `components/play/*` (lobby, board, battlefield drag, hand, zones, life, log, context menu)                                            | frontend, design  | P16-07, P16-08 |
+| P16-10 | `play_invite` notification type + `sendPlayInvite` (reuse `Friendship` accepted check)                                                                                | backend           | P16-05       |
+| P16-11 | Unit + leakage + decklist tests (`__tests__/game/{play,play-view,decklist}.test.ts`)                                                                                  | testing           | P16-01, P16-02 |
+| P16-12 | Import + socket integration tests (two real clients; inspect emitted payloads)                                                                                        | testing           | P16-04, P16-06 |
+| P16-13 | E2E `e2e/play.spec.ts` (two contexts; create/join/decklist/start/life-sync)                                                                                           | testing           | P16-09       |
+| P16-14 | Security review: leakage boundary on real payloads, Zod coverage, actor-seat server-derived, `set-deck` ownership                                                     | security          | P16-12       |
+
+**Exit criteria**
+
+- A 2+ player game runs end-to-end: lobby → import deck → start → draw/tap/drag/life sync in <500 ms; neither tab's WS frames ever contain the opponent's hand or library card ids.
+- Engine + leakage + decklist coverage ≥ 70% (pure logic, near-total). CI green.
+- `agent-security` signs off on the leakage boundary and Zod validation before merge.
+
+**Deferred follow-up (D23):** add `artist` to `Card` + re-sync, show artist credit on enlarged art, add the WotC Fan Content disclaimer + credits page — before any wider exposure of full card art.
 
 ---
 
