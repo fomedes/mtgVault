@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type Tab = "users" | "sets";
+type Tab = "users" | "sets" | "whitelists";
 
 interface UserRow {
   uid: string;
@@ -25,6 +25,13 @@ interface SetRow {
   cardCount: number;
 }
 
+interface WhitelistEntry {
+  email: string;
+  status: "active" | "pending";
+  addedBy: string;
+  createdAt: string;
+}
+
 const labelClass = "text-muted-foreground text-xs font-medium uppercase tracking-wider";
 const inputClass =
   "border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 w-24 rounded border px-2 py-1 text-sm outline-none focus-visible:ring-2";
@@ -33,11 +40,15 @@ export function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("users");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [sets, setSets] = useState<SetRow[]>([]);
+  const [whitelists, setWhitelists] = useState<WhitelistEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   // Grant VC state
   const [grantAmounts, setGrantAmounts] = useState<Record<string, string>>({});
+  // Whitelist add state
+  const [newEmail, setNewEmail] = useState("");
+  const [isAddingWhitelist, setIsAddingWhitelist] = useState(false);
 
   function showFeedback(msg: string) {
     setFeedback(msg);
@@ -48,9 +59,11 @@ export function AdminDashboard() {
     Promise.all([
       fetch("/api/admin/users").then((r) => r.json()),
       fetch("/api/admin/sets").then((r) => r.json()),
-    ]).then(([u, s]) => {
+      fetch("/api/admin/allowlist").then((r) => r.json()),
+    ]).then(([u, s, w]) => {
       setUsers((u as { users: UserRow[] }).users ?? []);
       setSets((s as { sets: SetRow[] }).sets ?? []);
+      setWhitelists((w as { whitelists: WhitelistEntry[] }).whitelists ?? []);
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
   }, []);
@@ -115,6 +128,45 @@ export function AdminDashboard() {
     }
   }
 
+  async function addWhitelist() {
+    if (!newEmail.trim()) return;
+    setIsAddingWhitelist(true);
+    try {
+      const res = await fetch("/api/admin/allowlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newEmail }),
+      });
+      if (res.ok) {
+        const entry = (await res.json()) as WhitelistEntry;
+        setWhitelists((prev) => [...prev, entry]);
+        setNewEmail("");
+        showFeedback(`Added ${newEmail} to whitelist`);
+      } else {
+        const err = (await res.json()) as { error: string };
+        if (err.error === "already_allowlisted") {
+          showFeedback("Email already whitelisted");
+        } else {
+          showFeedback("Error adding whitelist");
+        }
+      }
+    } finally {
+      setIsAddingWhitelist(false);
+    }
+  }
+
+  async function deleteWhitelist(email: string) {
+    const res = await fetch("/api/admin/allowlist", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (res.ok) {
+      setWhitelists((prev) => prev.filter((w) => w.email !== email));
+      showFeedback("Deleted from whitelist");
+    }
+  }
+
   const tabClass = (active: boolean) =>
     cn(
       "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
@@ -132,10 +184,72 @@ export function AdminDashboard() {
       <div className="flex gap-1 rounded-lg border p-1 w-fit">
         <button type="button" onClick={() => setTab("users")} className={tabClass(tab === "users")}>Users</button>
         <button type="button" onClick={() => setTab("sets")} className={tabClass(tab === "sets")}>Sets</button>
+        <button type="button" onClick={() => setTab("whitelists")} className={tabClass(tab === "whitelists")}>Whitelists</button>
       </div>
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
+      ) : tab === "whitelists" ? (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              type="email"
+              placeholder="user@example.com"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addWhitelist()}
+              className={cn(inputClass, "flex-1")}
+            />
+            <Button
+              onClick={addWhitelist}
+              disabled={!newEmail.trim() || isAddingWhitelist}
+            >
+              Add
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px] text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className={cn(labelClass, "pb-2 text-left")}>Email</th>
+                  <th className={cn(labelClass, "pb-2 text-center")}>Status</th>
+                  <th className={cn(labelClass, "pb-2 text-left")}>Added By</th>
+                  <th className={cn(labelClass, "pb-2 text-center")}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {whitelists.map((w) => (
+                  <tr key={w.email} className="border-b last:border-0">
+                    <td className="py-3 pr-4">{w.email}</td>
+                    <td className="py-3 pr-4 text-center">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-semibold",
+                          w.status === "active"
+                            ? "bg-green-500/15 text-green-400"
+                            : "bg-yellow-500/15 text-yellow-400",
+                        )}
+                      >
+                        {w.status === "active" ? "Active" : "Pending"}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4 text-muted-foreground text-xs">{w.addedBy}</td>
+                    <td className="py-3 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteWhitelist(w.email)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : tab === "users" ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-sm">
