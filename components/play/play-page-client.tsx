@@ -21,5 +21,16 @@ export function PlayPageClient({ myUid, decks }: { myUid: string; decks: DeckOpt
     return <PlayBoard myUid={myUid} />;
   }
 
-  return <PlayLobbyView myUid={myUid} decks={decks} />;
+  return (
+    <div className="mx-auto w-full max-w-6xl flex-1 flex flex-col gap-6 px-4 py-10">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">Play</h1>
+        <p className="text-muted-foreground text-sm">
+          Create a virtual tabletop or join with a code, import a deck, and play a manual game —
+          the board syncs; the rules are up to you.
+        </p>
+      </header>
+      <PlayLobbyView myUid={myUid} decks={decks} />
+    </div>
+  );
 }

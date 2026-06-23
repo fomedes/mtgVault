@@ -37,7 +37,7 @@ export function BattlefieldLayer({
   return (
     <div
       ref={containerRef}
-      className="border-border bg-muted/30 relative h-[42vh] min-h-64 w-full overflow-hidden rounded-lg border"
+      className="border-border bg-muted/30 relative flex-1 w-full overflow-hidden rounded-lg border"
     >
       {battlefield.length === 0 && (
         <p className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">

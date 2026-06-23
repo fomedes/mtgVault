@@ -9,6 +9,7 @@ import { LifeCounters } from "@/components/play/life-counters";
 import { LogPanel } from "@/components/play/log-panel";
 import { CardContextMenu, type ContextMenuState } from "@/components/play/card-context-menu";
 import type { ResolvedCard } from "@/components/play/board-card";
+import { PlayerBand } from "@/components/play/player-band";
 import { usePlaySocketConnection } from "@/hooks/use-play-socket";
 import { usePlayStore } from "@/store/play-store";
 import type { BoardAction, Zone } from "@/lib/game/play";
@@ -20,6 +21,7 @@ export function PlayBoard({ myUid }: { myUid: string }) {
   const cacheCards = usePlayStore((s) => s.cacheCards);
   const optimisticMove = usePlayStore((s) => s.optimisticMove);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [logOpen, setLogOpen] = useState(false);
 
   // Fetch card details for any cardObjectId not yet cached.
   useEffect(() => {
@@ -68,53 +70,73 @@ export function PlayBoard({ myUid }: { myUid: string }) {
   const mySeatView = board.seats.find((s) => s.seat === mySeat);
 
   return (
-    <div className="space-y-4" data-testid="play-board">
+    <div className="flex h-screen flex-col overflow-hidden" data-testid="play-board">
       {/* Top bar: life + turn + host controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <LifeCounters board={board} onAdjust={(seat, delta) => emit({ type: "ADJUST_LIFE", seat, delta })} />
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">
-            Active: {board.activeSeat === null ? "—" : board.seats[board.activeSeat]?.displayName}
-          </span>
-          <Button size="sm" variant="secondary" onClick={() => emit({ type: "SET_ACTIVE_SEAT", seat: mySeat })}>
-            My turn
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => emit({ type: "UNTAP_ALL" })}>
-            Untap all
-          </Button>
-          {isHost && board.status === "playing" && (
+      <div className="flex-shrink-0 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <LifeCounters board={board} onAdjust={(seat, delta) => emit({ type: "ADJUST_LIFE", seat, delta })} />
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-xs">
+              Active: {board.activeSeat === null ? "—" : board.seats[board.activeSeat]?.displayName}
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => emit({ type: "SET_ACTIVE_SEAT", seat: mySeat })}>
+              My turn
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => emit({ type: "UNTAP_ALL" })}>
+              Untap all
+            </Button>
+            {isHost && board.status === "playing" && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => socket.emit("play:end", { sessionId }, () => undefined)}
+              >
+                End game
+              </Button>
+            )}
             <Button
               size="sm"
-              variant="destructive"
-              onClick={() => socket.emit("play:end", { sessionId }, () => undefined)}
+              variant="outline"
+              onClick={() => setLogOpen(!logOpen)}
             >
-              End game
+              {logOpen ? "Hide" : "Show"} Log
             </Button>
-          )}
+          </div>
         </div>
+
+        {board.status === "ended" && (
+          <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
+            The game has ended.
+          </div>
+        )}
       </div>
 
-      {board.status === "ended" && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          The game has ended.
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        <div className="space-y-3">
-          {/* Opponents' zones */}
+      {/* Main board area */}
+      <div className="flex flex-1 overflow-hidden gap-4 px-4 py-4">
+        {/* Board content */}
+        <div className="flex-1 flex flex-col overflow-y-auto space-y-3">
+          {/* Opponents' bands */}
           {opponents.map((s) => (
-            <ZoneRow
-              key={s.seat}
-              seat={s}
-              isMe={false}
-              resolve={resolve}
-              onDraw={() => undefined}
-              onMill={() => undefined}
-              onShuffle={() => undefined}
-            />
+            <PlayerBand key={s.seat} seat={s.seat} isMe={false}>
+              <ZoneRow
+                seat={s}
+                isMe={false}
+                resolve={resolve}
+                onDraw={() => undefined}
+                onMill={() => undefined}
+                onShuffle={() => undefined}
+              />
+            </PlayerBand>
           ))}
 
+          {/* Combat line divider */}
+          <div className="flex items-center gap-2 py-2">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Combat Line</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Battlefield */}
           <BattlefieldLayer
             battlefield={board.battlefield}
             resolve={resolve}
@@ -125,30 +147,39 @@ export function PlayBoard({ myUid }: { myUid: string }) {
             onOpenMenu={setMenu}
           />
 
-          {/* My zones + hand */}
-          {mySeatView && (
-            <ZoneRow
-              seat={mySeatView}
-              isMe
-              resolve={resolve}
-              onDraw={() => emit({ type: "DRAW", count: 1 })}
-              onMill={() => emit({ type: "MILL", count: 1 })}
-              onShuffle={() => emit({ type: "SHUFFLE" })}
-            />
-          )}
-          <HandFan
-            hand={board.myHand}
-            resolve={resolve}
-            onPlay={(instanceId) =>
-              emit({ type: "MOVE_CARD", instanceId, target: { kind: "battlefield", x: 0.5, y: 0.6 } })
-            }
-            onContext={(instanceId, x, y) =>
-              setMenu({ instanceId, onBattlefield: false, tapped: false, faceDown: false, x, y })
-            }
-          />
+          {/* My band */}
+          <PlayerBand seat={mySeat} isMe>
+            <div className="space-y-3">
+              {mySeatView && (
+                <ZoneRow
+                  seat={mySeatView}
+                  isMe
+                  resolve={resolve}
+                  onDraw={() => emit({ type: "DRAW", count: 1 })}
+                  onMill={() => emit({ type: "MILL", count: 1 })}
+                  onShuffle={() => emit({ type: "SHUFFLE" })}
+                />
+              )}
+              <HandFan
+                hand={board.myHand}
+                resolve={resolve}
+                onPlay={(instanceId) =>
+                  emit({ type: "MOVE_CARD", instanceId, target: { kind: "battlefield", x: 0.5, y: 0.6 } })
+                }
+                onContext={(instanceId, x, y) =>
+                  setMenu({ instanceId, onBattlefield: false, tapped: false, faceDown: false, x, y })
+                }
+              />
+            </div>
+          </PlayerBand>
         </div>
 
-        <LogPanel log={board.log} />
+        {/* Collapsible log panel */}
+        {logOpen && (
+          <div className="flex-shrink-0 w-80 overflow-y-auto border-l border-border pl-4">
+            <LogPanel log={board.log} />
+          </div>
+        )}
       </div>
 
       {menu && (
