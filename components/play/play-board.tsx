@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { BattlefieldLayer } from "@/components/play/battlefield-layer";
+import { ZoneStrip } from "@/components/play/zone-strip";
 import { HandFan } from "@/components/play/hand-fan";
 import { ZoneRow } from "@/components/play/zone-row";
 import { LifeCounters } from "@/components/play/life-counters";
@@ -12,14 +12,16 @@ import type { ResolvedCard } from "@/components/play/board-card";
 import { PlayerBand } from "@/components/play/player-band";
 import { usePlaySocketConnection } from "@/hooks/use-play-socket";
 import { usePlayStore } from "@/store/play-store";
-import type { BoardAction, Zone } from "@/lib/game/play";
+import type { BoardAction, Zone, BattlefieldZone } from "@/lib/game/play";
+import { BATTLEFIELD_ZONES } from "@/lib/game/play";
 
 export function PlayBoard({ myUid }: { myUid: string }) {
   const socket = usePlaySocketConnection();
   const board = usePlayStore((s) => s.board);
   const cardCache = usePlayStore((s) => s.cardCache);
   const cacheCards = usePlayStore((s) => s.cacheCards);
-  const optimisticMove = usePlayStore((s) => s.optimisticMove);
+  const optimisticReorder = usePlayStore((s) => s.optimisticReorder);
+  const optimisticSetZone = usePlayStore((s) => s.optimisticSetZone);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [logOpen, setLogOpen] = useState(false);
 
@@ -118,14 +120,38 @@ export function PlayBoard({ myUid }: { myUid: string }) {
           {/* Opponents' bands */}
           {opponents.map((s) => (
             <PlayerBand key={s.seat} seat={s.seat} isMe={false}>
-              <ZoneRow
-                seat={s}
-                isMe={false}
-                resolve={resolve}
-                onDraw={() => undefined}
-                onMill={() => undefined}
-                onShuffle={() => undefined}
-              />
+              <div className="space-y-4">
+                <ZoneRow
+                  seat={s}
+                  isMe={false}
+                  resolve={resolve}
+                  onDraw={() => undefined}
+                  onMill={() => undefined}
+                  onShuffle={() => undefined}
+                />
+                {/* Opponent's battlefield zones */}
+                {(BATTLEFIELD_ZONES as readonly BattlefieldZone[]).map((zone) => {
+                  const cardsInZone = board.battlefield.filter(
+                    (b) => b.zone === zone && board.cards[b.instanceId]?.controllerSeat === s.seat
+                  );
+                  return (
+                    <ZoneStrip
+                      key={`${s.seat}-${zone}`}
+                      zone={zone}
+                      cards={cardsInZone}
+                      resolve={resolve}
+                      onReorder={(newOrder) => {
+                        optimisticReorder(zone, newOrder);
+                        emit({ type: "REORDER_ZONE", zone, newOrder });
+                      }}
+                      onOpenMenu={(instanceId, x, y) =>
+                        setMenu({ instanceId, onBattlefield: true, tapped: false, faceDown: false, x, y })
+                      }
+                      isOpponent
+                    />
+                  );
+                })}
+              </div>
             </PlayerBand>
           ))}
 
@@ -136,20 +162,9 @@ export function PlayBoard({ myUid }: { myUid: string }) {
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          {/* Battlefield */}
-          <BattlefieldLayer
-            battlefield={board.battlefield}
-            resolve={resolve}
-            onMove={(instanceId, x, y) => {
-              optimisticMove(instanceId, x, y);
-              emit({ type: "MOVE_ON_BATTLEFIELD", instanceId, x, y });
-            }}
-            onOpenMenu={setMenu}
-          />
-
           {/* My band */}
           <PlayerBand seat={mySeat} isMe>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {mySeatView && (
                 <ZoneRow
                   seat={mySeatView}
@@ -160,6 +175,27 @@ export function PlayBoard({ myUid }: { myUid: string }) {
                   onShuffle={() => emit({ type: "SHUFFLE" })}
                 />
               )}
+              {/* My battlefield zones */}
+              {(BATTLEFIELD_ZONES as readonly BattlefieldZone[]).map((zone) => {
+                const cardsInZone = board.battlefield.filter(
+                  (b) => b.zone === zone && board.cards[b.instanceId]?.controllerSeat === mySeat
+                );
+                return (
+                  <ZoneStrip
+                    key={`${mySeat}-${zone}`}
+                    zone={zone}
+                    cards={cardsInZone}
+                    resolve={resolve}
+                    onReorder={(newOrder) => {
+                      optimisticReorder(zone, newOrder);
+                      emit({ type: "REORDER_ZONE", zone, newOrder });
+                    }}
+                    onOpenMenu={(instanceId, x, y) =>
+                      setMenu({ instanceId, onBattlefield: true, tapped: false, faceDown: false, x, y })
+                    }
+                  />
+                );
+              })}
               <HandFan
                 hand={board.myHand}
                 resolve={resolve}

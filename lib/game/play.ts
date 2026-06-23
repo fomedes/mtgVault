@@ -24,6 +24,9 @@ export type LifeMode = "per-player" | "shared-team";
 export type Zone = "hand" | "library" | "graveyard" | "exile" | "command";
 export const ZONES: readonly Zone[] = ["hand", "library", "graveyard", "exile", "command"];
 
+export type BattlefieldZone = "creatures" | "other" | "lands";
+export const BATTLEFIELD_ZONES: readonly BattlefieldZone[] = ["creatures", "other", "lands"];
+
 /** Hidden zones are private to their owner; public zones are visible to all. */
 const HIDDEN_ZONES: readonly Zone[] = ["hand", "library"];
 
@@ -37,9 +40,11 @@ export interface CardInstance {
 
 export interface BattlefieldCard {
   instanceId: string;
-  x: number;
-  y: number;
-  z: number;
+  x: number; // deprecated in Phase 1+ but kept for backwards compat
+  y: number; // deprecated in Phase 1+ but kept for backwards compat
+  z: number; // deprecated in Phase 1+ but kept for backwards compat
+  zone: BattlefieldZone; // NEW: which row (creatures/other/lands)
+  order: number; // NEW: sort order within zone
   tapped: boolean;
   faceDown: boolean;
   /** DFC / transform toggle — back face shown when true. */
@@ -101,6 +106,8 @@ export type MoveTarget =
 
 export type BoardAction =
   | { type: "MOVE_ON_BATTLEFIELD"; instanceId: string; x: number; y: number }
+  | { type: "REORDER_ZONE"; zone: BattlefieldZone; newOrder: string[] }
+  | { type: "SET_ZONE"; instanceId: string; zone: BattlefieldZone }
   | { type: "TAP"; instanceId: string; tapped: boolean }
   | { type: "FLIP"; instanceId: string; faceDown: boolean }
   | { type: "TRANSFORM"; instanceId: string; flipped: boolean }
@@ -402,6 +409,10 @@ function dispatch(state: BoardState, actor: number, action: BoardAction): BoardS
   switch (action.type) {
     case "MOVE_ON_BATTLEFIELD":
       return moveOnBattlefield(state, action);
+    case "REORDER_ZONE":
+      return reorderZone(state, actor, action.zone, action.newOrder);
+    case "SET_ZONE":
+      return setZone(state, actor, action.instanceId, action.zone);
     case "TAP":
       return setBattlefieldFlag(state, action.instanceId, "tapped", action.tapped);
     case "FLIP":
@@ -459,6 +470,53 @@ function moveOnBattlefield(
     ...state,
     battlefield: state.battlefield.map((b) =>
       b.instanceId === action.instanceId ? { ...b, x: action.x, y: action.y, z: topZ } : b,
+    ),
+  };
+}
+
+function reorderZone(
+  state: BoardState,
+  actor: number,
+  zone: BattlefieldZone,
+  newOrder: string[],
+): BoardState {
+  // Verify all cards in newOrder are on battlefield in this zone and controlled by actor
+  const cardsInZone = state.battlefield.filter((b) => b.zone === zone);
+  const actorControlled = cardsInZone.filter((b) => state.cards[b.instanceId]?.controllerSeat === actor);
+
+  for (const id of newOrder) {
+    const card = actorControlled.find((c) => c.instanceId === id);
+    if (!card) fail("invalid_instance");
+  }
+
+  // Reassign order sequentially
+  const orderMap = new Map<string, number>();
+  newOrder.forEach((id, idx) => orderMap.set(id, idx));
+
+  return {
+    ...state,
+    battlefield: state.battlefield.map((b) =>
+      b.zone === zone && orderMap.has(b.instanceId)
+        ? { ...b, order: orderMap.get(b.instanceId)! }
+        : b,
+    ),
+  };
+}
+
+function setZone(
+  state: BoardState,
+  actor: number,
+  instanceId: string,
+  zone: BattlefieldZone,
+): BoardState {
+  const card = bfCard(state, instanceId);
+  const inst = state.cards[instanceId];
+  if (!inst || inst.controllerSeat !== actor) fail("not_owner");
+
+  return {
+    ...state,
+    battlefield: state.battlefield.map((b) =>
+      b.instanceId === instanceId ? { ...b, zone } : b,
     ),
   };
 }
@@ -553,6 +611,7 @@ function moveCard(
 
   if (target.kind === "battlefield") {
     const topZ = battlefield.reduce((m, b) => Math.max(m, b.z), 0) + 1;
+    const cardsInZone = battlefield.filter((b) => b.zone === "other").length;
     battlefield = [
       ...battlefield,
       {
@@ -560,6 +619,8 @@ function moveCard(
         x: target.x,
         y: target.y,
         z: topZ,
+        zone: "other",
+        order: cardsInZone,
         tapped: false,
         faceDown: target.faceDown ?? false,
         flipped: false,
@@ -703,6 +764,7 @@ function createToken(
     controllerSeat: actor,
   };
   const topZ = state.battlefield.reduce((m, b) => Math.max(m, b.z), 0) + 1;
+  const cardsInZone = state.battlefield.filter((b) => b.zone === "other").length;
   return {
     ...state,
     cards: { ...state.cards, [instanceId]: inst },
@@ -713,6 +775,8 @@ function createToken(
         x: action.x,
         y: action.y,
         z: topZ,
+        zone: "other",
+        order: cardsInZone,
         tapped: false,
         faceDown: false,
         flipped: false,

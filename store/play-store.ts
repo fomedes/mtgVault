@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PlayerBoardView, PlayStatus } from "@/lib/game/play";
+import type { PlayerBoardView, PlayStatus, BattlefieldZone } from "@/lib/game/play";
 import type { CardListItemDto } from "@/lib/api/card-dto";
 
 export interface PlayLobbyPlayer {
@@ -42,8 +42,10 @@ export interface PlayStoreState {
   setSocketConnected: (v: boolean) => void;
   applyLobby: (s: PlayLobbyState) => void;
   applyBoard: (view: PlayerBoardView) => void;
-  /** Optimistic local reposition of a battlefield card (server reconciles). */
-  optimisticMove: (instanceId: string, x: number, y: number) => void;
+  /** Optimistic local reorder of cards within a zone (server reconciles). */
+  optimisticReorder: (zone: BattlefieldZone, newOrder: string[]) => void;
+  /** Optimistic local zone assignment (server reconciles). */
+  optimisticSetZone: (instanceId: string, zone: BattlefieldZone) => void;
   setReveal: (r: RevealEvent | null) => void;
   cacheCards: (cards: Record<string, CardListItemDto>) => void;
   reset: () => void;
@@ -80,14 +82,31 @@ export const usePlayStore = create<PlayStoreState>((set) => ({
       return { board: view, status: view.status };
     }),
 
-  optimisticMove: (instanceId, x, y) =>
+  optimisticReorder: (zone, newOrder) =>
+    set((prev) => {
+      if (!prev.board) return prev;
+      const orderMap = new Map<string, number>();
+      newOrder.forEach((id, idx) => orderMap.set(id, idx));
+      return {
+        board: {
+          ...prev.board,
+          battlefield: prev.board.battlefield.map((b) =>
+            b.zone === zone && orderMap.has(b.instanceId)
+              ? { ...b, order: orderMap.get(b.instanceId)! }
+              : b,
+          ),
+        },
+      };
+    }),
+
+  optimisticSetZone: (instanceId, zone) =>
     set((prev) => {
       if (!prev.board) return prev;
       return {
         board: {
           ...prev.board,
           battlefield: prev.board.battlefield.map((b) =>
-            b.instanceId === instanceId ? { ...b, x, y } : b,
+            b.instanceId === instanceId ? { ...b, zone } : b,
           ),
         },
       };
