@@ -15,10 +15,26 @@ export interface ResolvedCard {
 export function BoardCard({
   card,
   className,
+  upsideDown,
 }: {
   card: ResolvedCard;
   className?: string;
+  upsideDown?: boolean;
 }) {
+  // Upside down shows cardback rotated 180°
+  if (upsideDown) {
+    return (
+      <img
+        src="/cardbacks/cardback.webp"
+        alt="Card back (upside down)"
+        className={cn(
+          "aspect-5/7 w-full rounded-[4.75%/3.43%] ring-1 ring-black/15 dark:ring-white/12 rotate-180",
+          className,
+        )}
+      />
+    );
+  }
+
   if (card.faceDown || !card.dto) {
     return (
       <div

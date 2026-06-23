@@ -20,6 +20,12 @@ export const battlefieldDrag: Variants = {
   drag: { scale: 1.05, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" },
 };
 
+/** Flip card upside down with 180° rotation around y-axis. */
+export const upsideDownFlip: Variants = {
+  upright: { rotateY: 0, transition: { type: "spring", stiffness: 300, damping: 20 } },
+  upsideDown: { rotateY: 180, transition: { type: "spring", stiffness: 300, damping: 20 } },
+};
+
 export function usePlayAnimations() {
   const reduced = useReducedMotion();
   return {
@@ -30,6 +36,9 @@ export function usePlayAnimations() {
       ? ({ hidden: { opacity: 0 }, visible: { opacity: 1 } } as Variants)
       : cardEnterZone,
     battlefieldDrag: reduced ? ({ rest: {}, drag: {} } as Variants) : battlefieldDrag,
+    upsideDownFlip: reduced
+      ? ({ upright: {}, upsideDown: {} } as Variants)
+      : upsideDownFlip,
     reduced: Boolean(reduced),
   };
 }

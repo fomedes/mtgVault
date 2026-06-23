@@ -49,6 +49,8 @@ export interface BattlefieldCard {
   faceDown: boolean;
   /** DFC / transform toggle — back face shown when true. */
   flipped: boolean;
+  /** Upside down — shows cardback.webp rotated 180°; distinct from faceDown. */
+  upsideDown?: boolean;
   counters: Record<string, number>;
 }
 
@@ -110,6 +112,7 @@ export type BoardAction =
   | { type: "SET_ZONE"; instanceId: string; zone: BattlefieldZone }
   | { type: "TAP"; instanceId: string; tapped: boolean }
   | { type: "FLIP"; instanceId: string; faceDown: boolean }
+  | { type: "FLIP_UPSIDE_DOWN"; instanceId: string; upsideDown: boolean }
   | { type: "TRANSFORM"; instanceId: string; flipped: boolean }
   | { type: "SET_COUNTER"; instanceId: string; key: string; value: number }
   | { type: "ADJUST_COUNTER"; instanceId: string; key: string; delta: number }
@@ -417,6 +420,8 @@ function dispatch(state: BoardState, actor: number, action: BoardAction): BoardS
       return setBattlefieldFlag(state, action.instanceId, "tapped", action.tapped);
     case "FLIP":
       return setBattlefieldFlag(state, action.instanceId, "faceDown", action.faceDown);
+    case "FLIP_UPSIDE_DOWN":
+      return setBattlefieldFlag(state, action.instanceId, "upsideDown", action.upsideDown);
     case "TRANSFORM":
       return setBattlefieldFlag(state, action.instanceId, "flipped", action.flipped);
     case "SET_COUNTER":
@@ -524,7 +529,7 @@ function setZone(
 function setBattlefieldFlag(
   state: BoardState,
   instanceId: string,
-  flag: "tapped" | "faceDown" | "flipped",
+  flag: "tapped" | "faceDown" | "flipped" | "upsideDown",
   value: boolean,
 ): BoardState {
   bfCard(state, instanceId);

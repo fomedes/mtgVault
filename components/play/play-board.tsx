@@ -229,6 +229,7 @@ export function PlayBoard({ myUid }: { myUid: string }) {
           actions={{
             onTap: (instanceId, tapped) => emit({ type: "TAP", instanceId, tapped }),
             onFlip: (instanceId, faceDown) => emit({ type: "FLIP", instanceId, faceDown }),
+            onFlipUpsideDown: (instanceId, upsideDown) => emit({ type: "FLIP_UPSIDE_DOWN", instanceId, upsideDown }),
             onTransform: (instanceId) => {
               const bf = board.battlefield.find((b) => b.instanceId === instanceId);
               emit({ type: "TRANSFORM", instanceId, flipped: !bf?.flipped });

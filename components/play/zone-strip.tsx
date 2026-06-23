@@ -61,7 +61,8 @@ export function ZoneStrip({
               <motion.div
                 variants={tapRotate}
                 animate={card.tapped ? "tapped" : "untapped"}
-                className={`origin-center cursor-grab active:cursor-grabbing ${
+                style={{ transformOrigin: "center center" }}
+                className={`cursor-grab active:cursor-grabbing ${
                   isOpponent ? "scale-y-[-1]" : ""
                 }`}
                 onContextMenu={(e) => {
@@ -69,7 +70,7 @@ export function ZoneStrip({
                   onOpenMenu(card.instanceId, e.clientX, e.clientY);
                 }}
               >
-                <BoardCard card={resolved} />
+                <BoardCard card={resolved} upsideDown={card.upsideDown} />
                 {Object.entries(card.counters).length > 0 && (
                   <div className="absolute -bottom-1 -right-1 flex flex-wrap gap-0.5">
                     {Object.entries(card.counters).map(([k, v]) => (

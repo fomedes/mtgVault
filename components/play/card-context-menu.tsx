@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Zone, BattlefieldZone } from "@/lib/game/play";
 
 export interface ContextMenuState {
@@ -17,6 +17,7 @@ export interface ContextMenuState {
 export interface CardMenuActions {
   onTap: (instanceId: string, tapped: boolean) => void;
   onFlip: (instanceId: string, faceDown: boolean) => void;
+  onFlipUpsideDown?: (instanceId: string, upsideDown: boolean) => void;
   onTransform: (instanceId: string) => void;
   onAdjustCounter: (instanceId: string, key: string, delta: number) => void;
   onMoveToZone: (instanceId: string, zone: Zone) => void;
@@ -42,6 +43,7 @@ export function CardContextMenu({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x: menu.x, y: menu.y });
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -51,12 +53,38 @@ export function CardContextMenu({
     return () => document.removeEventListener("mousedown", onDown);
   }, [onClose]);
 
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+
+    const rect = ref.current.getBoundingClientRect();
+    const PADDING = 8;
+
+    let x = menu.x;
+    let y = menu.y;
+
+    // Clamp horizontally
+    if (x + rect.width + PADDING > window.innerWidth) {
+      x = window.innerWidth - rect.width - PADDING;
+    }
+
+    // Clamp vertically
+    if (y + rect.height + PADDING > window.innerHeight) {
+      y = window.innerHeight - rect.height - PADDING;
+    }
+
+    // Ensure minimum position
+    x = Math.max(PADDING, x);
+    y = Math.max(PADDING, y);
+
+    setPosition({ x, y });
+  }, [menu.x, menu.y]);
+
   const item = "block w-full px-3 py-1.5 text-left text-sm hover:bg-accent rounded";
 
   return (
     <div
       ref={ref}
-      style={{ left: menu.x, top: menu.y }}
+      style={{ left: position.x, top: position.y }}
       className="border-border bg-popover fixed z-50 w-44 rounded-md border p-1 shadow-lg"
       role="menu"
     >
@@ -68,6 +96,16 @@ export function CardContextMenu({
           <button className={item} onClick={() => { actions.onFlip(menu.instanceId, !menu.faceDown); onClose(); }}>
             {menu.faceDown ? "Turn face up" : "Turn face down"}
           </button>
+          {actions.onFlipUpsideDown && (
+            <>
+              <button className={item} onClick={() => { actions.onFlipUpsideDown?.(menu.instanceId, true); onClose(); }}>
+                Flip upside down
+              </button>
+              <button className={item} onClick={() => { actions.onFlipUpsideDown?.(menu.instanceId, false); onClose(); }}>
+                Flip right-side up
+              </button>
+            </>
+          )}
           <button className={item} onClick={() => { actions.onTransform(menu.instanceId); onClose(); }}>
             Transform / flip
           </button>
