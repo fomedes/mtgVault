@@ -102,7 +102,7 @@ export interface BoardState {
 /** A position to drop a card into a zone or onto the battlefield. */
 export type MoveTarget =
   | { kind: "zone"; zone: Zone; toSeat: number; position: "top" | "bottom" }
-  | { kind: "battlefield"; x: number; y: number; faceDown?: boolean };
+  | { kind: "battlefield"; x: number; y: number; faceDown?: boolean; zone?: BattlefieldZone };
 
 export type BoardAction =
   | { type: "MOVE_ON_BATTLEFIELD"; instanceId: string; x: number; y: number }
@@ -611,7 +611,8 @@ function moveCard(
 
   if (target.kind === "battlefield") {
     const topZ = battlefield.reduce((m, b) => Math.max(m, b.z), 0) + 1;
-    const cardsInZone = battlefield.filter((b) => b.zone === "other").length;
+    const targetZone = target.zone ?? "other";
+    const cardsInZone = battlefield.filter((b) => b.zone === targetZone).length;
     battlefield = [
       ...battlefield,
       {
@@ -619,7 +620,7 @@ function moveCard(
         x: target.x,
         y: target.y,
         z: topZ,
-        zone: "other",
+        zone: targetZone,
         order: cardsInZone,
         tapped: false,
         faceDown: target.faceDown ?? false,

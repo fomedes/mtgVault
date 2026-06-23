@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Zone } from "@/lib/game/play";
+import type { Zone, BattlefieldZone } from "@/lib/game/play";
 
 export interface ContextMenuState {
   instanceId: string;
@@ -20,6 +20,7 @@ export interface CardMenuActions {
   onTransform: (instanceId: string) => void;
   onAdjustCounter: (instanceId: string, key: string, delta: number) => void;
   onMoveToZone: (instanceId: string, zone: Zone) => void;
+  onMoveToBattlefieldZone?: (instanceId: string, zone: BattlefieldZone) => void;
   onReveal: (instanceId: string) => void;
 }
 
@@ -82,6 +83,24 @@ export function CardContextMenu({
             </span>
           </div>
           <hr className="border-border my-1" />
+          {actions.onMoveToBattlefieldZone && (
+            <>
+              <p className="text-muted-foreground px-3 py-1 text-xs">Battlefield zone…</p>
+              {(["creatures", "other", "lands"] as const).map((bfZone) => (
+                <button
+                  key={bfZone}
+                  className={item}
+                  onClick={() => {
+                    actions.onMoveToBattlefieldZone?.(menu.instanceId, bfZone);
+                    onClose();
+                  }}
+                >
+                  {bfZone.charAt(0).toUpperCase() + bfZone.slice(1)}
+                </button>
+              ))}
+              <hr className="border-border my-1" />
+            </>
+          )}
         </>
       )}
       <button className={item} onClick={() => { actions.onReveal(menu.instanceId); onClose(); }}>

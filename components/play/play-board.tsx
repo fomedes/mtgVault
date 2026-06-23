@@ -14,6 +14,7 @@ import { usePlaySocketConnection } from "@/hooks/use-play-socket";
 import { usePlayStore } from "@/store/play-store";
 import type { BoardAction, Zone, BattlefieldZone } from "@/lib/game/play";
 import { BATTLEFIELD_ZONES } from "@/lib/game/play";
+import { getDefaultZone } from "@/lib/game/zone-routing";
 
 export function PlayBoard({ myUid }: { myUid: string }) {
   const socket = usePlaySocketConnection();
@@ -199,9 +200,12 @@ export function PlayBoard({ myUid }: { myUid: string }) {
               <HandFan
                 hand={board.myHand}
                 resolve={resolve}
-                onPlay={(instanceId) =>
-                  emit({ type: "MOVE_CARD", instanceId, target: { kind: "battlefield", x: 0.5, y: 0.6 } })
-                }
+                onPlay={(instanceId) => {
+                  const inst = board.cards[instanceId];
+                  const typeLine = inst ? cardCache.get(inst.cardObjectId)?.typeLine ?? "" : "";
+                  const zone = getDefaultZone(typeLine);
+                  emit({ type: "MOVE_CARD", instanceId, target: { kind: "battlefield", x: 0.5, y: 0.6, zone } });
+                }}
                 onContext={(instanceId, x, y) =>
                   setMenu({ instanceId, onBattlefield: false, tapped: false, faceDown: false, x, y })
                 }
@@ -236,6 +240,8 @@ export function PlayBoard({ myUid }: { myUid: string }) {
                 instanceId,
                 target: { kind: "zone", zone, toSeat: ownerOf(instanceId), position: "top" },
               }),
+            onMoveToBattlefieldZone: (instanceId, zone: BattlefieldZone) =>
+              emit({ type: "SET_ZONE", instanceId, zone }),
             onReveal: (instanceId) => emit({ type: "REVEAL", instanceId }),
           }}
         />
