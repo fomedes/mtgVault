@@ -3,7 +3,7 @@ import { getPlayerView, setConnected } from "@/lib/game/play";
 import {
   broadcastBoardViews,
   broadcastPlayLobby,
-  getPlay,
+  ensurePlayLoaded,
   iteratePlays,
   RECONNECT_GRACE_MS,
 } from "@/server/play/state";
@@ -21,12 +21,22 @@ export function registerPlayReconnectHandlers(io: Server, socket: Socket): void 
   // ── play:rejoin — resend the full snapshot for this seat ────────────────────
   socket.on(
     "play:rejoin",
-    (payload: unknown, ack: (res: { ok: boolean; error?: string }) => void) => {
+    async (
+      payload: unknown,
+      ack: (res: { ok: boolean; error?: string }) => void,
+    ) => {
       const parsed = sessionOnlySchema.safeParse(payload);
       if (!parsed.success) return ack({ ok: false, error: "invalid_payload" });
 
-      const active = getPlay(parsed.data.sessionId);
+      // Rehydrate from the Mongo checkpoint if the session was evicted from memory.
+      const active = await ensurePlayLoaded(parsed.data.sessionId);
       if (!active) return ack({ ok: false, error: "session_not_found" });
+
+      // Only seated players may rejoin (lobby roster or board seats).
+      const inRoster =
+        active.players.some((p) => p.uid === user.uid) ||
+        active.board?.seats.some((s) => s.uid === user.uid);
+      if (!inRoster) return ack({ ok: false, error: "not_in_session" });
 
       // Cancel any pending grace timer.
       const existing = active.disconnectTimers.get(user.uid);

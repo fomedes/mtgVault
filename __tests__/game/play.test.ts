@@ -220,6 +220,88 @@ describe("battlefield", () => {
   });
 });
 
+// ── Zone routing / reorder / flags ───────────────────────────────────────────
+
+describe("battlefield zones", () => {
+  function play(state: BoardState, seat: number, zone?: "creatures" | "other" | "lands") {
+    const id = state.seats[seat].zones.hand[0];
+    const next = applyAction(state, seat, {
+      type: "MOVE_CARD",
+      instanceId: id,
+      target: { kind: "battlefield", zone },
+    });
+    return { next, id };
+  }
+
+  it("MOVE_CARD honours the target zone and defaults to 'other'", () => {
+    const b = board();
+    const { next: routed, id } = play(b, 0, "creatures");
+    expect(routed.battlefield.find((c) => c.instanceId === id)?.zone).toBe("creatures");
+
+    const { next: defaulted, id: id2 } = play(b, 0);
+    expect(defaulted.battlefield.find((c) => c.instanceId === id2)?.zone).toBe("other");
+  });
+
+  it("SET_ZONE moves a controlled card to a new zone", () => {
+    const b = board();
+    const { next, id } = play(b, 0, "other");
+    const moved = applyAction(next, 0, { type: "SET_ZONE", instanceId: id, zone: "lands" });
+    expect(moved.battlefield.find((c) => c.instanceId === id)?.zone).toBe("lands");
+  });
+
+  it("SET_ZONE rejects a card the actor does not control", () => {
+    const b = board();
+    const { next, id } = play(b, 0, "other");
+    expect(() => applyAction(next, 1, { type: "SET_ZONE", instanceId: id, zone: "lands" })).toThrow("not_owner");
+  });
+
+  it("REORDER_ZONE reassigns order within a zone", () => {
+    const b = board();
+    const a = play(b, 0, "creatures");
+    const c = play(a.next, 0, "creatures");
+    const ids = [c.id, a.id]; // reversed
+    const reordered = applyAction(c.next, 0, { type: "REORDER_ZONE", zone: "creatures", newOrder: ids });
+    const orderOf = (id: string) => reordered.battlefield.find((x) => x.instanceId === id)!.order;
+    expect(orderOf(c.id)).toBe(0);
+    expect(orderOf(a.id)).toBe(1);
+  });
+
+  it("FLIP_UPSIDE_DOWN toggles the upsideDown flag", () => {
+    const b = board();
+    const { next, id } = play(b, 0, "lands");
+    const flipped = applyAction(next, 0, { type: "FLIP_UPSIDE_DOWN", instanceId: id, upsideDown: true });
+    expect(flipped.battlefield.find((c) => c.instanceId === id)?.upsideDown).toBe(true);
+  });
+});
+
+// ── Phases ───────────────────────────────────────────────────────────────────
+
+describe("phases", () => {
+  it("starts at the untap phase", () => {
+    expect(board().phase).toBe("untap");
+  });
+
+  it("SET_PHASE updates the shared phase", () => {
+    const b = board();
+    const a = applyAction(b, 0, { type: "SET_PHASE", phase: "combat" });
+    expect(a.phase).toBe("combat");
+  });
+
+  it("PASS_TURN advances the active seat, resets phase, and untaps the new active seat", () => {
+    const b = board();
+    // Seat 1 plays a permanent and taps it.
+    const id = b.seats[1].zones.hand[0];
+    const played = applyAction(b, 1, { type: "MOVE_CARD", instanceId: id, target: { kind: "battlefield", zone: "creatures" } });
+    const tapped = applyAction(played, 1, { type: "TAP", instanceId: id, tapped: true });
+    // Move to a later phase, then pass the turn (activeSeat starts at 0 → becomes 1).
+    const mid = applyAction(tapped, 0, { type: "SET_PHASE", phase: "main2" });
+    const passed = applyAction(mid, 0, { type: "PASS_TURN" });
+    expect(passed.activeSeat).toBe(1);
+    expect(passed.phase).toBe("untap");
+    expect(passed.battlefield.find((c) => c.instanceId === id)?.tapped).toBe(false);
+  });
+});
+
 // ── Permissions ──────────────────────────────────────────────────────────────
 
 describe("permissions", () => {

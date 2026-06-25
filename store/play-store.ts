@@ -1,6 +1,11 @@
 import { create } from "zustand";
-import type { PlayerBoardView, PlayStatus, BattlefieldZone } from "@/lib/game/play";
+import type {
+  PlayerBoardView,
+  PlayStatus,
+  BattlefieldZone,
+} from "@/lib/game/play";
 import type { CardListItemDto } from "@/lib/api/card-dto";
+import type { ArrowEvent } from "@/lib/play/arrow";
 
 export interface PlayLobbyPlayer {
   uid: string;
@@ -30,6 +35,36 @@ export interface RevealEvent {
   scryfallId: string;
 }
 
+// ── Session persistence (survives reload so the client can auto-rejoin) ──────
+const PLAY_SESSION_KEY = "mtgvault:play:session";
+
+export function getPersistedSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(PLAY_SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionId(sessionId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PLAY_SESSION_KEY, sessionId);
+  } catch {
+    /* ignore quota/availability errors */
+  }
+}
+
+export function clearPersistedSessionId(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PLAY_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface PlayStoreState {
   socketConnected: boolean;
   status: PlayStatus | "idle";
@@ -38,6 +73,8 @@ export interface PlayStoreState {
   /** cardObjectId → card dto (populated via /api/cards/batch). */
   cardCache: Map<string, CardListItemDto>;
   lastReveal: RevealEvent | null;
+  /** Most recent ephemeral targeting arrow (cleared after its TTL). */
+  lastArrow: ArrowEvent | null;
 
   setSocketConnected: (v: boolean) => void;
   applyLobby: (s: PlayLobbyState) => void;
@@ -47,13 +84,20 @@ export interface PlayStoreState {
   /** Optimistic local zone assignment (server reconciles). */
   optimisticSetZone: (instanceId: string, zone: BattlefieldZone) => void;
   setReveal: (r: RevealEvent | null) => void;
+  setArrow: (a: ArrowEvent | null) => void;
   cacheCards: (cards: Record<string, CardListItemDto>) => void;
   reset: () => void;
 }
 
 const initial: Pick<
   PlayStoreState,
-  "socketConnected" | "status" | "lobby" | "board" | "cardCache" | "lastReveal"
+  | "socketConnected"
+  | "status"
+  | "lobby"
+  | "board"
+  | "cardCache"
+  | "lastReveal"
+  | "lastArrow"
 > = {
   socketConnected: false,
   status: "idle",
@@ -61,6 +105,7 @@ const initial: Pick<
   board: null,
   cardCache: new Map(),
   lastReveal: null,
+  lastArrow: null,
 };
 
 export const usePlayStore = create<PlayStoreState>((set) => ({
@@ -68,17 +113,26 @@ export const usePlayStore = create<PlayStoreState>((set) => ({
 
   setSocketConnected: (v) => set({ socketConnected: v }),
 
-  applyLobby: (s) =>
+  applyLobby: (s) => {
+    // Remember the session so a reload can auto-rejoin it.
+    if (s.status === "ended") clearPersistedSessionId();
+    else persistSessionId(s.sessionId);
     set((prev) => ({
       lobby: s,
       // Don't downgrade away from an active board if a stale lobby arrives.
-      status: prev.status === "playing" && s.status === "lobby" ? prev.status : s.status,
-    })),
+      status:
+        prev.status === "playing" && s.status === "lobby"
+          ? prev.status
+          : s.status,
+    }));
+  },
 
   applyBoard: (view) =>
     set((prev) => {
       // Server is authoritative: only accept a non-stale version.
       if (prev.board && view.version < prev.board.version) return prev;
+      if (view.status === "ended") clearPersistedSessionId();
+      else persistSessionId(view.sessionId);
       return { board: view, status: view.status };
     }),
 
@@ -114,6 +168,8 @@ export const usePlayStore = create<PlayStoreState>((set) => ({
 
   setReveal: (r) => set({ lastReveal: r }),
 
+  setArrow: (a) => set({ lastArrow: a }),
+
   cacheCards: (cards) =>
     set((s) => {
       const next = new Map(s.cardCache);
@@ -121,5 +177,8 @@ export const usePlayStore = create<PlayStoreState>((set) => ({
       return { cardCache: next };
     }),
 
-  reset: () => set({ ...initial, cardCache: new Map() }),
+  reset: () => {
+    clearPersistedSessionId();
+    set({ ...initial, cardCache: new Map() });
+  },
 }));

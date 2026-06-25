@@ -62,6 +62,7 @@ export function BattlefieldLayer({
                 onOpenMenu({
                   instanceId: bf.instanceId,
                   onBattlefield: true,
+                  inHand: false,
                   tapped: bf.tapped,
                   faceDown: bf.faceDown,
                   x: e.clientX,

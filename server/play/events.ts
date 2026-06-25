@@ -6,7 +6,11 @@ import {
   checkpoint,
   getPlay,
 } from "@/server/play/state";
-import { actionSchema, sessionOnlySchema } from "@/server/play/schemas";
+import {
+  actionSchema,
+  arrowSchema,
+  sessionOnlySchema,
+} from "@/server/play/schemas";
 
 interface SocketUser {
   uid: string;
@@ -26,7 +30,8 @@ export function registerPlayEventHandlers(io: Server, socket: Socket): void {
     ) => {
       try {
         const parsed = actionSchema.safeParse(payload);
-        if (!parsed.success) return ack({ ok: false, error: "invalid_payload" });
+        if (!parsed.success)
+          return ack({ ok: false, error: "invalid_payload" });
 
         const active = getPlay(parsed.data.sessionId);
         if (!active?.board || active.status !== "playing") {
@@ -71,17 +76,65 @@ export function registerPlayEventHandlers(io: Server, socket: Socket): void {
     },
   );
 
+  // ── play:arrow — ephemeral targeting arrow (cosmetic, never persisted) ──────
+  socket.on(
+    "play:arrow",
+    (
+      payload: unknown,
+      ack?: (res: { ok: boolean; error?: string }) => void,
+    ) => {
+      try {
+        const parsed = arrowSchema.safeParse(payload);
+        if (!parsed.success)
+          return ack?.({ ok: false, error: "invalid_payload" });
+
+        const active = getPlay(parsed.data.sessionId);
+        if (!active?.board || active.status !== "playing") {
+          return ack?.({ ok: false, error: "not_playing" });
+        }
+
+        // by is derived server-side — never trusted from the payload.
+        const by = active.board.seats.findIndex((s) => s.uid === user.uid);
+        if (by === -1) return ack?.({ ok: false, error: "not_in_session" });
+
+        // Source must be a battlefield card the sender is allowed to see.
+        const bf = active.board.battlefield.find(
+          (b) => b.instanceId === parsed.data.source,
+        );
+        const inst = active.board.cards[parsed.data.source];
+        if (!bf || !inst)
+          return ack?.({ ok: false, error: "invalid_instance" });
+        const canSee =
+          !bf.faceDown || inst.ownerSeat === by || inst.controllerSeat === by;
+        if (!canSee) return ack?.({ ok: false, error: "not_visible" });
+
+        io.to(parsed.data.sessionId).emit("play:arrow", {
+          by,
+          source: parsed.data.source,
+          target: parsed.data.target,
+          at: Date.now(),
+        });
+        ack?.({ ok: true });
+      } catch (err) {
+        console.error("[play:arrow]", err);
+        ack?.({ ok: false, error: "server_error" });
+      }
+    },
+  );
+
   // ── play:end — host ends the game ───────────────────────────────────────────
   socket.on(
     "play:end",
     (payload: unknown, ack: (res: { ok: boolean; error?: string }) => void) => {
       try {
         const parsed = sessionOnlySchema.safeParse(payload);
-        if (!parsed.success) return ack({ ok: false, error: "invalid_payload" });
+        if (!parsed.success)
+          return ack({ ok: false, error: "invalid_payload" });
 
         const active = getPlay(parsed.data.sessionId);
         if (!active) return ack({ ok: false, error: "session_not_found" });
-        if (user.uid !== active.config.hostUid) return ack({ ok: false, error: "not_host" });
+        if (user.uid !== active.config.hostUid)
+          return ack({ ok: false, error: "not_host" });
         if (!active.board) return ack({ ok: false, error: "not_playing" });
 
         active.board = endGame(active.board);

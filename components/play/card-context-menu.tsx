@@ -7,6 +7,8 @@ export interface ContextMenuState {
   instanceId: string;
   /** Where the card currently is, so we offer relevant actions. */
   onBattlefield: boolean;
+  /** In the local seat's hand — offer "Play" / "Play face down". */
+  inHand: boolean;
   tapped: boolean;
   faceDown: boolean;
   /** Screen coordinates for the menu. */
@@ -22,6 +24,10 @@ export interface CardMenuActions {
   onAdjustCounter: (instanceId: string, key: string, delta: number) => void;
   onMoveToZone: (instanceId: string, zone: Zone) => void;
   onMoveToBattlefieldZone?: (instanceId: string, zone: BattlefieldZone) => void;
+  /** Play a hand card face up to its type-default lane. */
+  onPlay?: (instanceId: string) => void;
+  /** Play a hand card face down to the battlefield. */
+  onPlayFaceDown?: (instanceId: string) => void;
   onReveal: (instanceId: string) => void;
 }
 
@@ -88,6 +94,33 @@ export function CardContextMenu({
       className="border-border bg-popover fixed z-50 w-44 rounded-md border p-1 shadow-lg"
       role="menu"
     >
+      {menu.inHand && (actions.onPlay || actions.onPlayFaceDown) && (
+        <>
+          {actions.onPlay && (
+            <button
+              className={item}
+              onClick={() => {
+                actions.onPlay?.(menu.instanceId);
+                onClose();
+              }}
+            >
+              Play
+            </button>
+          )}
+          {actions.onPlayFaceDown && (
+            <button
+              className={item}
+              onClick={() => {
+                actions.onPlayFaceDown?.(menu.instanceId);
+                onClose();
+              }}
+            >
+              Play face down
+            </button>
+          )}
+          <hr className="border-border my-1" />
+        </>
+      )}
       {menu.onBattlefield && (
         <>
           <button className={item} onClick={() => { actions.onTap(menu.instanceId, !menu.tapped); onClose(); }}>

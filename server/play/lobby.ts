@@ -11,8 +11,8 @@ import {
   broadcastBoardViews,
   broadcastPlayLobby,
   checkpoint,
+  ensurePlayLoadedByCode,
   getPlay,
-  getPlayByCode,
   registerPlay,
 } from "@/server/play/state";
 import { sendPlayInvite } from "@/server/play/notifications";
@@ -20,10 +20,23 @@ import {
   createSchema,
   inviteSchema,
   joinSchema,
+  listSchema,
   readySchema,
   sessionOnlySchema,
   setDeckSchema,
 } from "@/server/play/schemas";
+
+/** Summary card for the Play landing (rejoin list + friends' open tables). */
+interface PlaySummary {
+  sessionId: string;
+  shortCode: string;
+  formatLabel: string;
+  status: "lobby" | "playing" | "ended";
+  playerCount: number;
+  seatedCount: number;
+  hostName: string;
+  playerNames: string[];
+}
 
 interface SocketUser {
   uid: string;
@@ -121,7 +134,7 @@ export function registerPlayHandlers(io: Server, socket: Socket): void {
         const parsed = joinSchema.safeParse(payload);
         if (!parsed.success) return ack({ ok: false, error: "invalid_payload" });
 
-        const active = getPlayByCode(parsed.data.shortCode);
+        const active = await ensurePlayLoadedByCode(parsed.data.shortCode);
         if (!active) return ack({ ok: false, error: "lobby_not_found" });
 
         const { sessionId } = active;
@@ -171,6 +184,93 @@ export function registerPlayHandlers(io: Server, socket: Socket): void {
         ack({ ok: true, sessionId });
       } catch (err) {
         console.error("[playlobby:join]", err);
+        ack({ ok: false, error: "server_error" });
+      }
+    },
+  );
+
+  // ── playlobby:list — my rejoinable games + friends' open tables ────────────
+  socket.on(
+    "playlobby:list",
+    async (
+      payload: unknown,
+      ack: (res: {
+        ok: boolean;
+        myGames?: PlaySummary[];
+        openTables?: PlaySummary[];
+        error?: string;
+      }) => void,
+    ) => {
+      try {
+        const parsed = listSchema.safeParse(payload ?? {});
+        if (!parsed.success) return ack({ ok: false, error: "invalid_payload" });
+
+        await connectToDatabase();
+
+        const toSummary = (doc: {
+          sessionId: string;
+          shortCode: string;
+          formatLabel: string;
+          status: string;
+          playerCount: number;
+          hostUid: string;
+          players: { uid: string; displayName?: string }[];
+        }): PlaySummary => {
+          const players = doc.players ?? [];
+          return {
+            sessionId: doc.sessionId,
+            shortCode: doc.shortCode,
+            formatLabel: doc.formatLabel,
+            status: doc.status as PlaySummary["status"],
+            playerCount: doc.playerCount,
+            seatedCount: players.length,
+            hostName:
+              players.find((p) => p.uid === doc.hostUid)?.displayName ||
+              "Unknown",
+            playerNames: players.map((p) => p.displayName || "Player"),
+          };
+        };
+
+        // Games the caller is already seated in and can rejoin.
+        const myDocs = await PlaySession.find({
+          "players.uid": user.uid,
+          status: { $in: ["lobby", "playing"] },
+        })
+          .sort({ updatedAt: -1 })
+          .limit(20)
+          .lean();
+
+        // Accepted friends → their open (lobby) tables that aren't full.
+        const friendships = await Friendship.find({
+          status: "accepted",
+          $or: [{ userA: user.uid }, { userB: user.uid }],
+        }).lean();
+        const friendUids = friendships.map((f) =>
+          f.userA === user.uid ? f.userB : f.userA,
+        );
+
+        const openDocs = friendUids.length
+          ? await PlaySession.find({
+              hostUid: { $in: friendUids },
+              status: "lobby",
+            })
+              .sort({ updatedAt: -1 })
+              .limit(20)
+              .lean()
+          : [];
+
+        const mySessionIds = new Set(myDocs.map((m) => m.sessionId));
+        const myGames = myDocs.map(toSummary);
+        const openTables = openDocs
+          .map(toSummary)
+          // Exclude full tables and any I'm already seated in (shown under myGames).
+          .filter(
+            (s) => s.seatedCount < s.playerCount && !mySessionIds.has(s.sessionId),
+          );
+
+        ack({ ok: true, myGames, openTables });
+      } catch (err) {
+        console.error("[playlobby:list]", err);
         ack({ ok: false, error: "server_error" });
       }
     },

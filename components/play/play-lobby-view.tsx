@@ -1,11 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { emitWithTimeout, usePlaySocketConnection } from "@/hooks/use-play-socket";
 import { usePlayStore } from "@/store/play-store";
 import type { DeckOption } from "@/components/play/play-page-client";
 import { cn } from "@/lib/utils";
+
+/** Mirrors PlaySummary returned by the `playlobby:list` socket handler. */
+interface PlaySummary {
+  sessionId: string;
+  shortCode: string;
+  formatLabel: string;
+  status: "lobby" | "playing" | "ended";
+  playerCount: number;
+  seatedCount: number;
+  hostName: string;
+  playerNames: string[];
+}
+
+interface PlayListResult {
+  ok: boolean;
+  myGames?: PlaySummary[];
+  openTables?: PlaySummary[];
+  error?: string;
+}
 
 const LIFE_PRESETS = [20, 25, 30, 40];
 
@@ -38,6 +57,69 @@ function LobbyEntry({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [myGames, setMyGames] = useState<PlaySummary[]>([]);
+  const [openTables, setOpenTables] = useState<PlaySummary[]>([]);
+  const [listLoading, setListLoading] = useState(false);
+
+  // Promise-chain (not async/await) so the setState lives inside a `.then`
+  // callback — safe to invoke from an effect (cf. components/history/history-list.tsx).
+  const refreshList = useCallback((): Promise<void> => {
+    if (!connected) return Promise.resolve();
+    return emitWithTimeout<PlayListResult>(socket, "playlobby:list", {})
+      .then((res) => {
+        if (res.ok) {
+          setMyGames(res.myGames ?? []);
+          setOpenTables(res.openTables ?? []);
+        }
+      })
+      .catch(() => {
+        /* leave the last good list in place */
+      });
+  }, [socket, connected]);
+
+  // Manual refresh (button) — fine to flip the spinner synchronously here since
+  // it runs in an event handler, not an effect.
+  const manualRefresh = useCallback(() => {
+    setListLoading(true);
+    void refreshList().finally(() => setListLoading(false));
+  }, [refreshList]);
+
+  // Load (and refresh on (re)connect) the rejoin + friends'-tables lists.
+  useEffect(() => {
+    void refreshList();
+  }, [refreshList]);
+
+  async function rejoin(sessionId: string) {
+    setError(null);
+    try {
+      const res = await emitWithTimeout<{ ok: boolean; error?: string }>(
+        socket,
+        "play:rejoin",
+        { sessionId },
+      );
+      if (!res.ok) setError(res.error ?? "Could not rejoin");
+    } catch {
+      setError("Server unreachable");
+    }
+  }
+
+  async function joinByCode(code: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await emitWithTimeout<{ ok: boolean; error?: string }>(
+        socket,
+        "playlobby:join",
+        { shortCode: code.trim().toUpperCase() },
+      );
+      if (!res.ok) setError(res.error ?? "Failed to join");
+    } catch {
+      setError("Server unreachable");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function create() {
     setBusy(true);
     setError(null);
@@ -57,21 +139,11 @@ function LobbyEntry({
   }
 
   async function join() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await emitWithTimeout<{ ok: boolean; error?: string }>(socket, "playlobby:join", {
-        shortCode: shortCode.trim().toUpperCase(),
-      });
-      if (!res.ok) setError(res.error ?? "Failed to join");
-    } catch {
-      setError("Server unreachable");
-    } finally {
-      setBusy(false);
-    }
+    await joinByCode(shortCode);
   }
 
   return (
+    <div className="space-y-8">
     <div className="grid gap-6 md:grid-cols-2">
       <section className="border-border bg-card rounded-lg border p-5">
         <h2 className="mb-4 text-lg font-semibold">Create a table</h2>
@@ -148,6 +220,121 @@ function LobbyEntry({
         )}
         {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
       </section>
+    </div>
+
+      <PlayLists
+        myGames={myGames}
+        openTables={openTables}
+        loading={listLoading}
+        busy={busy}
+        connected={connected}
+        onRefresh={manualRefresh}
+        onRejoin={rejoin}
+        onJoin={joinByCode}
+      />
+    </div>
+  );
+}
+
+// ─── Rejoin + friends'-tables lists ───────────────────────────────────────────
+
+function PlayLists({
+  myGames,
+  openTables,
+  loading,
+  busy,
+  connected,
+  onRefresh,
+  onRejoin,
+  onJoin,
+}: {
+  myGames: PlaySummary[];
+  openTables: PlaySummary[];
+  loading: boolean;
+  busy: boolean;
+  connected: boolean;
+  onRefresh: () => void;
+  onRejoin: (sessionId: string) => void;
+  onJoin: (shortCode: string) => void;
+}) {
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <section className="border-border bg-card rounded-lg border p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Your games</h2>
+          <Button
+            onClick={onRefresh}
+            disabled={!connected || loading}
+            variant="ghost"
+            size="sm"
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
+        {myGames.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No games in progress. Create or join a table to get started.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {myGames.map((g) => (
+              <li
+                key={g.sessionId}
+                className="border-border flex items-center justify-between gap-3 rounded-md border p-3"
+              >
+                <TableMeta summary={g} />
+                <Button onClick={() => onRejoin(g.sessionId)} disabled={!connected} size="sm">
+                  Rejoin
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="border-border bg-card rounded-lg border p-5">
+        <h2 className="mb-3 text-lg font-semibold">Friends&apos; open tables</h2>
+        {openTables.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No friends have an open table right now.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {openTables.map((g) => (
+              <li
+                key={g.sessionId}
+                className="border-border flex items-center justify-between gap-3 rounded-md border p-3"
+              >
+                <TableMeta summary={g} />
+                <Button
+                  onClick={() => onJoin(g.shortCode)}
+                  disabled={!connected || busy}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Join
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function TableMeta({ summary }: { summary: PlaySummary }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-sm font-medium">
+        {summary.hostName}
+        <span className="text-muted-foreground"> · {summary.formatLabel}</span>
+      </p>
+      <p className="text-muted-foreground text-xs">
+        <span className="font-mono tracking-widest">{summary.shortCode}</span> ·{" "}
+        {summary.status === "playing" ? "in progress" : "in lobby"} ·{" "}
+        {summary.seatedCount}/{summary.playerCount}
+      </p>
     </div>
   );
 }

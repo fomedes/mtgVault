@@ -16,6 +16,8 @@
  * between ordered arrays.
  */
 
+import { type Phase, FIRST_PHASE } from "./phases";
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export type PlayStatus = "lobby" | "playing" | "ended";
@@ -93,6 +95,8 @@ export interface BoardState {
   battlefield: BattlefieldCard[];
   /** Soft turn marker — no enforcement. */
   activeSeat: number | null;
+  /** Advisory turn phase, shared by all seats — no enforcement. */
+  phase: Phase;
   /** Ring buffer of opponent-safe log lines. */
   log: LogEntry[];
   /** Server-only PRNG state — stripped from every view. */
@@ -104,7 +108,7 @@ export interface BoardState {
 /** A position to drop a card into a zone or onto the battlefield. */
 export type MoveTarget =
   | { kind: "zone"; zone: Zone; toSeat: number; position: "top" | "bottom" }
-  | { kind: "battlefield"; x: number; y: number; faceDown?: boolean; zone?: BattlefieldZone };
+  | { kind: "battlefield"; x?: number; y?: number; faceDown?: boolean; zone?: BattlefieldZone };
 
 export type BoardAction =
   | { type: "MOVE_ON_BATTLEFIELD"; instanceId: string; x: number; y: number }
@@ -126,6 +130,8 @@ export type BoardAction =
   | { type: "SET_LIFE"; seat: number; value: number }
   | { type: "ADJUST_LIFE"; seat: number; delta: number }
   | { type: "SET_ACTIVE_SEAT"; seat: number | null }
+  | { type: "SET_PHASE"; phase: Phase }
+  | { type: "PASS_TURN" }
   | { type: "UNTAP_ALL" }
   | { type: "MULLIGAN" };
 
@@ -170,6 +176,7 @@ export interface PlayerBoardView {
   lifeMode: LifeMode;
   teamLife: Record<number, number>;
   activeSeat: number | null;
+  phase: Phase;
   version: number;
   mySeat: number;
   seats: PublicSeatView[];
@@ -373,6 +380,7 @@ export function createBoard(
     cards,
     battlefield: [],
     activeSeat: 0,
+    phase: FIRST_PHASE,
     log: [{ seq: 1, seat: 0, text: "Game started." }],
     rngSeed: rng.state(),
     version: 1,
@@ -448,6 +456,10 @@ function dispatch(state: BoardState, actor: number, action: BoardAction): BoardS
       return setLife(state, actor, action.seat, action.delta, true);
     case "SET_ACTIVE_SEAT":
       return setActiveSeat(state, actor, action.seat);
+    case "SET_PHASE":
+      return setPhase(state, actor, action.phase);
+    case "PASS_TURN":
+      return passTurn(state, actor);
     case "UNTAP_ALL":
       return untapAll(state, actor);
     case "MULLIGAN":
@@ -514,7 +526,7 @@ function setZone(
   instanceId: string,
   zone: BattlefieldZone,
 ): BoardState {
-  const card = bfCard(state, instanceId);
+  bfCard(state, instanceId);
   const inst = state.cards[instanceId];
   if (!inst || inst.controllerSeat !== actor) fail("not_owner");
 
@@ -622,8 +634,8 @@ function moveCard(
       ...battlefield,
       {
         instanceId,
-        x: target.x,
-        y: target.y,
+        x: target.x ?? 0,
+        y: target.y ?? 0,
         z: topZ,
         zone: targetZone,
         order: cardsInZone,
@@ -846,6 +858,35 @@ function setActiveSeat(state: BoardState, actor: number, seat: number | null): B
   };
 }
 
+function setPhase(state: BoardState, actor: number, phase: Phase): BoardState {
+  return {
+    ...state,
+    phase,
+    log: appendLog(state, actor, `${displayName(state, actor)} moved to ${phase}.`),
+  };
+}
+
+/**
+ * Advance the turn: hand priority to the next seat, reset to the first phase,
+ * and untap the new active seat's permanents (paper convention). Advisory only.
+ */
+function passTurn(state: BoardState, actor: number): BoardState {
+  const current = state.activeSeat ?? actor;
+  const nextSeat = (current + 1) % state.seats.length;
+  const battlefield = state.battlefield.map((b) =>
+    state.cards[b.instanceId]?.controllerSeat === nextSeat && b.tapped
+      ? { ...b, tapped: false }
+      : b,
+  );
+  return {
+    ...state,
+    activeSeat: nextSeat,
+    phase: FIRST_PHASE,
+    battlefield,
+    log: appendLog(state, actor, `It is now ${displayName(state, nextSeat)}'s turn.`),
+  };
+}
+
 export function endGame(state: BoardState): BoardState {
   return { ...state, status: "ended" };
 }
@@ -917,6 +958,7 @@ export function getPlayerView(state: BoardState, seat: number): PlayerBoardView 
     lifeMode: state.lifeMode,
     teamLife: { ...state.teamLife },
     activeSeat: state.activeSeat,
+    phase: state.phase ?? FIRST_PHASE,
     version: state.version,
     mySeat: seat,
     seats,

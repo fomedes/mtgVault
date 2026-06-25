@@ -157,4 +157,66 @@
   --color-mana-red: #d3202a;
   --color-mana-green: #00733e;
   --color-mana-colorless: #c8c4bf;
+  /* Battlefield playmat tints — each side reads as its own territory. */
+  --color-playmat-mine: oklch(0.24 0.04 250);
+  --color-playmat-foe: oklch(0.24 0.045 18);
+}
+
+/* ── Battlefield playmat surface (Arena-style stage) ──────────────────────── */
+@layer components {
+  /* Soft per-side radial wash, brightest at the outer edge, fading toward the
+     combat line — territory without hard borders. */
+  .playmat-mine {
+    background: radial-gradient(
+      135% 90% at 50% 100%,
+      color-mix(in oklch, var(--color-playmat-mine) 70%, transparent) 0%,
+      transparent 72%
+    );
+  }
+  .playmat-foe {
+    background: radial-gradient(
+      135% 90% at 50% 0%,
+      color-mix(in oklch, var(--color-playmat-foe) 65%, transparent) 0%,
+      transparent 72%
+    );
+  }
+  /* Corner-darkening vignette to focus play toward the centre. Host must be
+     positioned (relative/absolute). */
+  .playmat-vignette::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 95% at 50% 50%, transparent 58%, rgb(0 0 0 / 0.34) 100%);
+  }
+  /* Luminous divider between the two halves. */
+  .combat-line {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--color-primary) 75%, transparent) 50%,
+      transparent 100%
+    );
+    box-shadow:
+      0 0 10px 1px color-mix(in oklch, var(--color-primary) 30%, transparent),
+      0 0 3px 0 color-mix(in oklch, var(--color-primary) 55%, transparent);
+  }
+  .combat-line-shimmer {
+    background-size: 220% 100%;
+    animation: combat-line-pan 7s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .combat-line-shimmer {
+      animation: none;
+    }
+  }
+}
+
+@keyframes combat-line-pan {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
 }

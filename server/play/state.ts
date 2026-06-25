@@ -72,6 +72,67 @@ export function registerPlay(sessionId: string, active: ActivePlay): void {
   shortCodeIndex.set(active.shortCode.toUpperCase(), sessionId);
 }
 
+/**
+ * Return the live ActivePlay, rehydrating it from the Mongo checkpoint if the
+ * server process no longer holds it in memory (e.g. after a free-tier restart).
+ * `boardState` is checkpointed after every action, so a `playing`/`ended` session
+ * is fully recoverable; a session evicted mid-lobby loses its resolved
+ * `deckLibrary` (players simply re-pick a deck).
+ */
+export async function ensurePlayLoaded(
+  sessionId: string,
+): Promise<ActivePlay | undefined> {
+  const existing = plays.get(sessionId);
+  if (existing) return existing;
+
+  await connectToDatabase();
+  const doc = await PlaySession.findOne({ sessionId }).lean();
+  if (!doc) return undefined;
+
+  const active: ActivePlay = {
+    sessionId: doc.sessionId,
+    shortCode: doc.shortCode,
+    status: doc.status,
+    config: {
+      formatLabel: doc.formatLabel,
+      playerCount: doc.playerCount,
+      lifeMode: doc.lifeMode,
+      startingLife: doc.startingLife,
+      hostUid: doc.hostUid,
+    },
+    players: (doc.players ?? []).map((p) => ({
+      uid: p.uid,
+      displayName: p.displayName ?? "",
+      seatIndex: p.seatIndex,
+      teamId: p.teamId ?? 0,
+      isReady: p.isReady ?? false,
+      deckSourceKind: p.deckSource?.kind ?? undefined,
+    })),
+    board: (doc.boardState as BoardState | null) ?? null,
+    sockets: new Map(),
+    disconnectTimers: new Map(),
+  };
+  registerPlay(sessionId, active);
+  return active;
+}
+
+/** Like `getPlayByCode`, but rehydrates from Mongo when missing from memory. */
+export async function ensurePlayLoadedByCode(
+  shortCode: string,
+): Promise<ActivePlay | undefined> {
+  const existing = getPlayByCode(shortCode);
+  if (existing) return existing;
+
+  await connectToDatabase();
+  const doc = await PlaySession.findOne({
+    shortCode: shortCode.toUpperCase(),
+  })
+    .select({ sessionId: 1 })
+    .lean();
+  if (!doc) return undefined;
+  return ensurePlayLoaded(doc.sessionId);
+}
+
 export function iteratePlays(): IterableIterator<[string, ActivePlay]> {
   return plays.entries();
 }

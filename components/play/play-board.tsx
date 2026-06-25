@@ -1,22 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ZoneStrip } from "@/components/play/zone-strip";
-import { HandFan } from "@/components/play/hand-fan";
-import { ZoneRow } from "@/components/play/zone-row";
+import { PlayStage } from "@/components/play/play-stage";
 import { LifeCounters } from "@/components/play/life-counters";
+import { TurnPhaseBar } from "@/components/play/turn-phase-bar";
 import { LogPanel } from "@/components/play/log-panel";
-import { CardContextMenu, type ContextMenuState } from "@/components/play/card-context-menu";
+import {
+  CardContextMenu,
+  type ContextMenuState,
+} from "@/components/play/card-context-menu";
 import type { ResolvedCard } from "@/components/play/board-card";
-import { PlayerBand } from "@/components/play/player-band";
+import { ImmersiveStage } from "@/components/play/immersive-stage";
+import { OrientationGuard } from "@/components/play/orientation-guard";
+import { ArrowOverlay } from "@/components/play/arrow-overlay";
 import { usePlaySocketConnection } from "@/hooks/use-play-socket";
 import { usePlayStore } from "@/store/play-store";
 import type { BoardAction, Zone, BattlefieldZone } from "@/lib/game/play";
-import { BATTLEFIELD_ZONES } from "@/lib/game/play";
 import { getDefaultZone } from "@/lib/game/zone-routing";
 
 export function PlayBoard({ myUid }: { myUid: string }) {
+  const router = useRouter();
   const socket = usePlaySocketConnection();
   const board = usePlayStore((s) => s.board);
   const cardCache = usePlayStore((s) => s.cardCache);
@@ -31,7 +36,10 @@ export function PlayBoard({ myUid }: { myUid: string }) {
     if (!board) return;
     const needed = new Set<string>();
     for (const inst of Object.values(board.cards)) {
-      if (!cardCache.has(inst.cardObjectId) && /^[0-9a-fA-F]{24}$/.test(inst.cardObjectId)) {
+      if (
+        !cardCache.has(inst.cardObjectId) &&
+        /^[0-9a-fA-F]{24}$/.test(inst.cardObjectId)
+      ) {
         needed.add(inst.cardObjectId);
       }
     }
@@ -39,9 +47,15 @@ export function PlayBoard({ myUid }: { myUid: string }) {
     const ids = [...needed].slice(0, 60).join(",");
     fetch(`/api/cards/batch?ids=${encodeURIComponent(ids)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { cards: Record<string, Parameters<typeof cacheCards>[0][string]> } | null) => {
-        if (d?.cards) cacheCards(d.cards);
-      })
+      .then(
+        (
+          d: {
+            cards: Record<string, Parameters<typeof cacheCards>[0][string]>;
+          } | null,
+        ) => {
+          if (d?.cards) cacheCards(d.cards);
+        },
+      )
       .catch(() => undefined);
   }, [board, cardCache, cacheCards]);
 
@@ -69,184 +83,197 @@ export function PlayBoard({ myUid }: { myUid: string }) {
   if (!board) return null;
 
   const mySeat = board.mySeat;
-  const opponents = board.seats.filter((s) => s.seat !== mySeat);
-  const mySeatView = board.seats.find((s) => s.seat === mySeat);
+
+  // Play a hand card to its type-appropriate lane (creatures/lands/other).
+  function playFromHand(instanceId: string, faceDown = false) {
+    if (!board) return;
+    const inst = board.cards[instanceId];
+    const typeLine = inst
+      ? (cardCache.get(inst.cardObjectId)?.typeLine ?? "")
+      : "";
+    emit({
+      type: "MOVE_CARD",
+      instanceId,
+      target: { kind: "battlefield", zone: getDefaultZone(typeLine), faceDown },
+    });
+  }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden" data-testid="play-board">
-      {/* Top bar: life + turn + host controls */}
-      <div className="flex-shrink-0 border-b border-border px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <LifeCounters board={board} onAdjust={(seat, delta) => emit({ type: "ADJUST_LIFE", seat, delta })} />
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">
-              Active: {board.activeSeat === null ? "—" : board.seats[board.activeSeat]?.displayName}
-            </span>
-            <Button size="sm" variant="secondary" onClick={() => emit({ type: "SET_ACTIVE_SEAT", seat: mySeat })}>
-              My turn
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => emit({ type: "UNTAP_ALL" })}>
-              Untap all
-            </Button>
-            {isHost && board.status === "playing" && (
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => socket.emit("play:end", { sessionId }, () => undefined)}
-              >
-                End game
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setLogOpen(!logOpen)}
-            >
-              {logOpen ? "Hide" : "Show"} Log
-            </Button>
-          </div>
-        </div>
-
-        {board.status === "ended" && (
-          <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
-            The game has ended.
-          </div>
-        )}
-      </div>
-
-      {/* Main board area */}
-      <div className="flex flex-1 overflow-hidden gap-4 px-4 py-4">
-        {/* Board content */}
-        <div className="flex-1 flex flex-col overflow-y-auto space-y-3">
-          {/* Opponents' bands */}
-          {opponents.map((s) => (
-            <PlayerBand key={s.seat} seat={s.seat} isMe={false}>
-              <div className="space-y-4">
-                <ZoneRow
-                  seat={s}
-                  isMe={false}
-                  resolve={resolve}
-                  onDraw={() => undefined}
-                  onMill={() => undefined}
-                  onShuffle={() => undefined}
+    <ImmersiveStage>
+      <OrientationGuard>
+        <div
+          className="flex h-full flex-col overflow-hidden"
+          data-testid="play-board"
+        >
+          {/* Top bar: life + turn + host controls */}
+          <div className="border-border flex-shrink-0 border-b px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <LifeCounters
+                board={board}
+                onAdjust={(seat, delta) =>
+                  emit({ type: "ADJUST_LIFE", seat, delta })
+                }
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <TurnPhaseBar
+                  phase={board.phase}
+                  activeSeat={board.activeSeat}
+                  mySeat={mySeat}
+                  activeName={
+                    board.activeSeat === null
+                      ? null
+                      : (board.seats[board.activeSeat]?.displayName ?? null)
+                  }
+                  onSetPhase={(phase) => emit({ type: "SET_PHASE", phase })}
+                  onPassTurn={() => emit({ type: "PASS_TURN" })}
+                  onUntapAll={() => emit({ type: "UNTAP_ALL" })}
+                  onTakeTurn={() =>
+                    emit({ type: "SET_ACTIVE_SEAT", seat: mySeat })
+                  }
                 />
-                {/* Opponent's battlefield zones */}
-                {(BATTLEFIELD_ZONES as readonly BattlefieldZone[]).map((zone) => {
-                  const cardsInZone = board.battlefield.filter(
-                    (b) => b.zone === zone && board.cards[b.instanceId]?.controllerSeat === s.seat
-                  );
-                  return (
-                    <ZoneStrip
-                      key={`${s.seat}-${zone}`}
-                      zone={zone}
-                      cards={cardsInZone}
-                      resolve={resolve}
-                      onReorder={(newOrder) => {
-                        optimisticReorder(zone, newOrder);
-                        emit({ type: "REORDER_ZONE", zone, newOrder });
-                      }}
-                      onOpenMenu={(instanceId, x, y) =>
-                        setMenu({ instanceId, onBattlefield: true, tapped: false, faceDown: false, x, y })
-                      }
-                      isOpponent
-                    />
-                  );
-                })}
-              </div>
-            </PlayerBand>
-          ))}
-
-          {/* Combat line divider */}
-          <div className="flex items-center gap-2 py-2">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Combat Line</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          {/* My band */}
-          <PlayerBand seat={mySeat} isMe>
-            <div className="space-y-4">
-              {mySeatView && (
-                <ZoneRow
-                  seat={mySeatView}
-                  isMe
-                  resolve={resolve}
-                  onDraw={() => emit({ type: "DRAW", count: 1 })}
-                  onMill={() => emit({ type: "MILL", count: 1 })}
-                  onShuffle={() => emit({ type: "SHUFFLE" })}
-                />
-              )}
-              {/* My battlefield zones */}
-              {(BATTLEFIELD_ZONES as readonly BattlefieldZone[]).map((zone) => {
-                const cardsInZone = board.battlefield.filter(
-                  (b) => b.zone === zone && board.cards[b.instanceId]?.controllerSeat === mySeat
-                );
-                return (
-                  <ZoneStrip
-                    key={`${mySeat}-${zone}`}
-                    zone={zone}
-                    cards={cardsInZone}
-                    resolve={resolve}
-                    onReorder={(newOrder) => {
-                      optimisticReorder(zone, newOrder);
-                      emit({ type: "REORDER_ZONE", zone, newOrder });
-                    }}
-                    onOpenMenu={(instanceId, x, y) =>
-                      setMenu({ instanceId, onBattlefield: true, tapped: false, faceDown: false, x, y })
+                {isHost && board.status === "playing" && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() =>
+                      socket.emit("play:end", { sessionId }, () => undefined)
                     }
-                  />
-                );
-              })}
-              <HandFan
-                hand={board.myHand}
+                  >
+                    End game
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLogOpen(!logOpen)}
+                >
+                  {logOpen ? "Hide" : "Show"} Log
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => router.push("/dashboard")}
+                >
+                  Leave
+                </Button>
+              </div>
+            </div>
+
+            {board.status === "ended" && (
+              <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
+                The game has ended.
+              </div>
+            )}
+          </div>
+
+          {/* Main board area — full-bleed stage + optional log drawer */}
+          <div className="relative flex min-h-0 flex-1 overflow-hidden">
+            <div className="min-h-0 flex-1">
+              <PlayStage
+                board={board}
                 resolve={resolve}
-                onPlay={(instanceId) => {
-                  const inst = board.cards[instanceId];
-                  const typeLine = inst ? cardCache.get(inst.cardObjectId)?.typeLine ?? "" : "";
-                  const zone = getDefaultZone(typeLine);
-                  emit({ type: "MOVE_CARD", instanceId, target: { kind: "battlefield", x: 0.5, y: 0.6, zone } });
+                onReorder={(zone, newOrder) => {
+                  optimisticReorder(zone, newOrder);
+                  emit({ type: "REORDER_ZONE", zone, newOrder });
                 }}
-                onContext={(instanceId, x, y) =>
-                  setMenu({ instanceId, onBattlefield: false, tapped: false, faceDown: false, x, y })
+                onOpenMenu={(instanceId, x, y) =>
+                  setMenu({
+                    instanceId,
+                    onBattlefield: true,
+                    inHand: false,
+                    tapped: false,
+                    faceDown: false,
+                    x,
+                    y,
+                  })
+                }
+                onPlayFromHand={playFromHand}
+                onPlayToZone={(instanceId, zone) =>
+                  emit({
+                    type: "MOVE_CARD",
+                    instanceId,
+                    target: { kind: "battlefield", zone },
+                  })
+                }
+                onDraw={() => emit({ type: "DRAW", count: 1 })}
+                onMill={() => emit({ type: "MILL", count: 1 })}
+                onShuffle={() => emit({ type: "SHUFFLE" })}
+                onHandContext={(instanceId, x, y) =>
+                  setMenu({
+                    instanceId,
+                    onBattlefield: false,
+                    inHand: true,
+                    tapped: false,
+                    faceDown: false,
+                    x,
+                    y,
+                  })
                 }
               />
             </div>
-          </PlayerBand>
-        </div>
 
-        {/* Collapsible log panel */}
-        {logOpen && (
-          <div className="flex-shrink-0 w-80 overflow-y-auto border-l border-border pl-4">
-            <LogPanel log={board.log} />
+            {logOpen && (
+              <div className="border-border bg-background/95 w-80 flex-shrink-0 overflow-y-auto border-l p-4">
+                <LogPanel log={board.log} />
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {menu && (
-        <CardContextMenu
-          menu={menu}
-          onClose={() => setMenu(null)}
-          actions={{
-            onTap: (instanceId, tapped) => emit({ type: "TAP", instanceId, tapped }),
-            onFlip: (instanceId, faceDown) => emit({ type: "FLIP", instanceId, faceDown }),
-            onFlipUpsideDown: (instanceId, upsideDown) => emit({ type: "FLIP_UPSIDE_DOWN", instanceId, upsideDown }),
-            onTransform: (instanceId) => {
-              const bf = board.battlefield.find((b) => b.instanceId === instanceId);
-              emit({ type: "TRANSFORM", instanceId, flipped: !bf?.flipped });
-            },
-            onAdjustCounter: (instanceId, key, delta) => emit({ type: "ADJUST_COUNTER", instanceId, key, delta }),
-            onMoveToZone: (instanceId, zone: Zone) =>
-              emit({
-                type: "MOVE_CARD",
-                instanceId,
-                target: { kind: "zone", zone, toSeat: ownerOf(instanceId), position: "top" },
-              }),
-            onMoveToBattlefieldZone: (instanceId, zone: BattlefieldZone) =>
-              emit({ type: "SET_ZONE", instanceId, zone }),
-            onReveal: (instanceId) => emit({ type: "REVEAL", instanceId }),
-          }}
-        />
-      )}
-    </div>
+          <ArrowOverlay
+            onEmit={(source, target) =>
+              socket.emit("play:arrow", { sessionId, source, target })
+            }
+          />
+
+          {menu && (
+            <CardContextMenu
+              menu={menu}
+              onClose={() => setMenu(null)}
+              actions={{
+                onTap: (instanceId, tapped) =>
+                  emit({ type: "TAP", instanceId, tapped }),
+                onFlip: (instanceId, faceDown) =>
+                  emit({ type: "FLIP", instanceId, faceDown }),
+                onFlipUpsideDown: (instanceId, upsideDown) =>
+                  emit({ type: "FLIP_UPSIDE_DOWN", instanceId, upsideDown }),
+                onTransform: (instanceId) => {
+                  const bf = board.battlefield.find(
+                    (b) => b.instanceId === instanceId,
+                  );
+                  emit({
+                    type: "TRANSFORM",
+                    instanceId,
+                    flipped: !bf?.flipped,
+                  });
+                },
+                onAdjustCounter: (instanceId, key, delta) =>
+                  emit({ type: "ADJUST_COUNTER", instanceId, key, delta }),
+                onMoveToZone: (instanceId, zone: Zone) =>
+                  emit({
+                    type: "MOVE_CARD",
+                    instanceId,
+                    target: {
+                      kind: "zone",
+                      zone,
+                      toSeat: ownerOf(instanceId),
+                      position: "top",
+                    },
+                  }),
+                onMoveToBattlefieldZone: (
+                  instanceId,
+                  zone: BattlefieldZone,
+                ) => {
+                  optimisticSetZone(instanceId, zone);
+                  emit({ type: "SET_ZONE", instanceId, zone });
+                },
+                onPlay: (instanceId) => playFromHand(instanceId),
+                onPlayFaceDown: (instanceId) => playFromHand(instanceId, true),
+                onReveal: (instanceId) => emit({ type: "REVEAL", instanceId }),
+              }}
+            />
+          )}
+        </div>
+      </OrientationGuard>
+    </ImmersiveStage>
   );
 }
