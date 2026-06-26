@@ -9,24 +9,23 @@ import type { PlayerView } from "@/lib/game/draft";
 
 let sharedSocket: Socket | null = null;
 let wired = false;
+/** Set after an "unauthorized" rejection so the next attempt forces a fresh token. */
+let forceRefreshNext = false;
 
 /**
- * Resolve the Firebase ID token for a (re)connect attempt. socket.io calls this
- * before EVERY connection attempt, so a token that expired while the tab was
- * open is refreshed automatically (getIdToken() refreshes when near expiry)
- * instead of leaving the socket permanently stuck on a stale token.
+ * Resolve the current Firebase ID token, or null if no user is signed in.
+ * `getIdToken()` transparently refreshes a token that's expired or near expiry,
+ * so reconnecting after the tab idled past the token lifetime just works.
  */
-async function resolveAuth(
-  cb: (data: Record<string, unknown>) => void,
-): Promise<void> {
+async function getSignedInToken(forceRefresh = false): Promise<string | null> {
   try {
     const auth = getFirebaseAuth();
     await auth.authStateReady();
     const user = auth.currentUser;
-    if (!user) return cb({});
-    cb({ token: await user.getIdToken() });
+    if (!user) return null;
+    return await user.getIdToken(forceRefresh);
   } catch {
-    cb({});
+    return null;
   }
 }
 
@@ -50,7 +49,11 @@ export function getSocket(): Socket {
       withCredentials: true,
       // Auth as a function → fresh token on every (re)connect attempt.
       auth: (cb) => {
-        void resolveAuth(cb);
+        const force = forceRefreshNext;
+        forceRefreshNext = false;
+        void getSignedInToken(force).then((token) =>
+          cb(token ? { token } : {}),
+        );
       },
       reconnectionAttempts: 10,
       reconnectionDelay: 500,
@@ -72,9 +75,11 @@ function ensureWired(socket: Socket): void {
     // drop the manager will try to recover from → show as reconnecting.
     conn().set(reason === "io client disconnect" ? "idle" : "connecting");
   });
-  socket.on("connect_error", (err: Error) =>
-    conn().set("error", friendlyConnectError(err)),
-  );
+  socket.on("connect_error", (err: Error) => {
+    // An auth rejection is usually a stale token — force a refresh next attempt.
+    if (err?.message === "unauthorized") forceRefreshNext = true;
+    conn().set("error", friendlyConnectError(err));
+  });
   socket.io.on("reconnect_attempt", () => conn().set("connecting"));
   socket.io.on("reconnect_failed", () =>
     conn().set("error", "Couldn't reconnect to the server."),
@@ -83,19 +88,30 @@ function ensureWired(socket: Socket): void {
 
 /**
  * Idempotently bring up the shared socket. Safe to call from every hook/component
- * that needs the connection — only the first call actually dials.
+ * that needs the connection — only the first call actually dials. We confirm a
+ * signed-in user BEFORE dialing so we never hand the server an empty token (which
+ * it would reject as "unauthorized"); if signed out we surface that instead.
  */
 export function connectSocket(): Socket {
   const socket = getSocket();
   ensureWired(socket);
-  if (!socket.connected && !socket.active) {
-    useConnectionStore.getState().set("connecting");
-    socket.connect();
-  }
+  if (socket.connected || socket.active) return socket;
+
+  useConnectionStore.getState().set("connecting");
+  void (async () => {
+    const token = await getSignedInToken();
+    if (!token) {
+      useConnectionStore
+        .getState()
+        .set("error", "You appear to be signed out. Sign in again to play.");
+      return;
+    }
+    if (!socket.connected && !socket.active) socket.connect();
+  })();
   return socket;
 }
 
-/** User-triggered retry after an error (Retry button). */
+/** User-triggered retry after an error (Retry button) — forces a fresh token. */
 export function retryConnection(): void {
   const socket = getSocket();
   ensureWired(socket);
@@ -103,8 +119,18 @@ export function retryConnection(): void {
     useConnectionStore.getState().set("connected");
     return;
   }
+  forceRefreshNext = true;
   useConnectionStore.getState().set("connecting");
-  socket.connect();
+  void (async () => {
+    const token = await getSignedInToken(true);
+    if (!token) {
+      useConnectionStore
+        .getState()
+        .set("error", "You appear to be signed out. Sign in again to play.");
+      return;
+    }
+    socket.connect();
+  })();
 }
 
 /**

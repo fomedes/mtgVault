@@ -60,17 +60,39 @@ async function main() {
   });
 
   // Auth middleware — verify Firebase ID token + allowlist on every connection.
+  // Each rejection logs a DISTINCT reason so an "unauthorized" on the client can
+  // be traced to its actual cause (missing token / bad token / not allowlisted /
+  // infra) in the server logs instead of being an opaque catch-all.
   io.use(async (socket, next) => {
+    const origin = socket.handshake.headers.origin ?? "?";
     try {
       const token = socket.handshake.auth?.token;
       if (typeof token !== "string" || token.length === 0) {
+        console.warn(`[auth] reject: missing token (origin=${origin})`);
         return next(new Error("unauthorized"));
       }
-      const decoded = await getAdminAuth().verifyIdToken(token);
+
+      let decoded;
+      try {
+        decoded = await getAdminAuth().verifyIdToken(token);
+      } catch (err) {
+        console.warn(
+          `[auth] reject: token verify failed (origin=${origin}):`,
+          (err as Error)?.message,
+        );
+        return next(new Error("unauthorized"));
+      }
+
       const email = normalizeEmail(decoded.email ?? "");
+      // Ensure the DB is connected before the allowlist query — a dropped Mongo
+      // connection must not masquerade as an auth failure.
+      await connectToDatabase();
       const entry = await AllowlistEntry.findOne({ email }).lean();
       const decision = evaluateAllowlist(entry);
-      if (!decision.allowed) return next(new Error("unauthorized"));
+      if (!decision.allowed) {
+        console.warn(`[auth] reject: not on allowlist (${email})`);
+        return next(new Error("unauthorized"));
+      }
 
       const dbUser = await User.findOne({ uid: decoded.uid }, { displayName: 1 }).lean();
 
@@ -81,7 +103,8 @@ async function main() {
         displayName: dbUser?.displayName ?? email,
       } satisfies SocketUser;
       next();
-    } catch {
+    } catch (err) {
+      console.error(`[auth] reject: unexpected error (origin=${origin}):`, err);
       next(new Error("unauthorized"));
     }
   });
