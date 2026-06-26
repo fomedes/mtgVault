@@ -56,18 +56,20 @@ export function removeSession(sessionId: string): void {
 export function checkpoint(sessionId: string): void {
   const active = sessions.get(sessionId);
   if (!active) return;
-  void connectToDatabase().then(() =>
-    DraftSession.updateOne(
-      { sessionId },
-      {
-        $set: {
-          draftState: active.state,
-          status: active.state.status,
-          ...(active.state.status === "complete" ? { completedAt: new Date() } : {}),
+  void connectToDatabase()
+    .then(() =>
+      DraftSession.updateOne(
+        { sessionId },
+        {
+          $set: {
+            draftState: active.state,
+            status: active.state.status,
+            ...(active.state.status === "complete" ? { completedAt: new Date() } : {}),
+          },
         },
-      },
-    ),
-  );
+      ),
+    )
+    .catch((err) => console.error("[draft checkpoint] persist failed:", err));
 }
 
 // ─── Timer helpers ─────────────────────────────────────────────────────────────

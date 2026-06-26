@@ -14,7 +14,19 @@ import { handleDisconnect, registerReconnectHandlers } from "@/server/draft/reco
 import { registerPlayHandlers } from "@/server/play/lobby";
 import { registerPlayEventHandlers } from "@/server/play/events";
 import { handlePlayDisconnect, registerPlayReconnectHandlers } from "@/server/play/reconnect";
+import { makeOriginValidator } from "@/server/socket-origin";
 import { markOffline, markOnline } from "@/server/presence";
+
+// Crash isolation: a single rejected promise or thrown error in any handler must
+// not take down the whole socket server (which would drop every live draft and
+// game at once). Log and keep serving — Mongo-checkpointed boards still recover
+// on a real restart.
+process.on("unhandledRejection", (reason) => {
+  console.error("[socket] unhandledRejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[socket] uncaughtException:", err);
+});
 
 interface SocketUser {
   uid: string;
@@ -40,7 +52,9 @@ async function main() {
 
   const io = new Server(httpServer, {
     cors: {
-      origin: socketEnv.SOCKET_CORS_ORIGIN.split(","),
+      // Configured prod origins + localhost + private-LAN hosts (see
+      // server/socket-origin.ts). The token+allowlist handshake is the real gate.
+      origin: makeOriginValidator(socketEnv.SOCKET_CORS_ORIGIN),
       credentials: true,
     },
   });

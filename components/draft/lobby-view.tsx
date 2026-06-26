@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConnectionStatus } from "@/components/connection-status";
 import { useSocketConnection } from "@/hooks/use-socket";
 import { useDraftStore } from "@/store/draft-store";
 import { cn } from "@/lib/utils";
@@ -130,15 +131,10 @@ export function LobbyView({
   }
 
   // ── Connection status banner ──────────────────────────────────────────────
+  // Shared component: surfaces connecting / error (+ Retry); renders nothing once
+  // connected. Replaces the old silent "Connecting…" banner.
 
-  const connectionBanner = !socketConnected ? (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400">
-      Connecting to draft server…{" "}
-      <span className="text-muted-foreground text-xs">
-        (run <code className="font-mono">pnpm dev:socket</code> locally)
-      </span>
-    </div>
-  ) : null;
+  const connectionBanner = <ConnectionStatus />;
 
   // ── In lobby ──────────────────────────────────────────────────────────────
   if (amInLobby) {

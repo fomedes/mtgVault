@@ -147,18 +147,20 @@ export function removePlay(sessionId: string): void {
 export function checkpoint(sessionId: string): void {
   const active = plays.get(sessionId);
   if (!active) return;
-  void connectToDatabase().then(() =>
-    PlaySession.updateOne(
-      { sessionId },
-      {
-        $set: {
-          boardState: active.board,
-          status: active.status,
-          ...(active.status === "ended" ? { endedAt: new Date() } : {}),
+  void connectToDatabase()
+    .then(() =>
+      PlaySession.updateOne(
+        { sessionId },
+        {
+          $set: {
+            boardState: active.board,
+            status: active.status,
+            ...(active.status === "ended" ? { endedAt: new Date() } : {}),
+          },
         },
-      },
-    ),
-  );
+      ),
+    )
+    .catch((err) => console.error("[play checkpoint] persist failed:", err));
 }
 
 // ─── Broadcasts ─────────────────────────────────────────────────────────────

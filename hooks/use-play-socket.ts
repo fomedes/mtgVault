@@ -2,8 +2,7 @@
 
 import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
-import { getFirebaseAuth } from "@/lib/firebase/client";
-import { getSocket } from "@/hooks/use-socket";
+import { connectSocket, getSocket } from "@/hooks/use-socket";
 import {
   clearPersistedSessionId,
   getPersistedSessionId,
@@ -21,19 +20,9 @@ import type { ArrowEvent } from "@/lib/play/arrow";
  */
 export function usePlaySocketConnection(): Socket {
   useEffect(() => {
-    const socket = getSocket();
-
-    async function connect() {
-      if (socket.connected) return;
-      const auth = getFirebaseAuth();
-      await auth.authStateReady();
-      const user = auth.currentUser;
-      if (!user) return;
-      const token = await user.getIdToken();
-      socket.auth = { token };
-      socket.connect();
-    }
-    void connect();
+    // The connection (auth, reconnection, lifecycle) is owned centrally; this
+    // hook only adds the play-specific listeners.
+    const socket = connectSocket();
 
     const store = () => usePlayStore.getState();
 
@@ -97,8 +86,9 @@ export function usePlaySocketConnection(): Socket {
     socket.on("play:arrow", onArrow);
 
     // If the socket is already connected when this effect runs (e.g. navigating
-    // back to the page), rejoin right away — the `connect` event won't refire.
+    // back to the page), reflect it and rejoin now — `connect` won't refire.
     if (socket.connected) {
+      store().setSocketConnected(true);
       rejoin(store().lobby?.sessionId ?? getPersistedSessionId());
     }
 

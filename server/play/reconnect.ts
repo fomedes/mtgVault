@@ -25,39 +25,45 @@ export function registerPlayReconnectHandlers(io: Server, socket: Socket): void 
       payload: unknown,
       ack: (res: { ok: boolean; error?: string }) => void,
     ) => {
-      const parsed = sessionOnlySchema.safeParse(payload);
-      if (!parsed.success) return ack({ ok: false, error: "invalid_payload" });
+      try {
+        const parsed = sessionOnlySchema.safeParse(payload);
+        if (!parsed.success)
+          return ack({ ok: false, error: "invalid_payload" });
 
-      // Rehydrate from the Mongo checkpoint if the session was evicted from memory.
-      const active = await ensurePlayLoaded(parsed.data.sessionId);
-      if (!active) return ack({ ok: false, error: "session_not_found" });
+        // Rehydrate from the Mongo checkpoint if the session was evicted from memory.
+        const active = await ensurePlayLoaded(parsed.data.sessionId);
+        if (!active) return ack({ ok: false, error: "session_not_found" });
 
-      // Only seated players may rejoin (lobby roster or board seats).
-      const inRoster =
-        active.players.some((p) => p.uid === user.uid) ||
-        active.board?.seats.some((s) => s.uid === user.uid);
-      if (!inRoster) return ack({ ok: false, error: "not_in_session" });
+        // Only seated players may rejoin (lobby roster or board seats).
+        const inRoster =
+          active.players.some((p) => p.uid === user.uid) ||
+          active.board?.seats.some((s) => s.uid === user.uid);
+        if (!inRoster) return ack({ ok: false, error: "not_in_session" });
 
-      // Cancel any pending grace timer.
-      const existing = active.disconnectTimers.get(user.uid);
-      if (existing) {
-        clearTimeout(existing);
-        active.disconnectTimers.delete(user.uid);
+        // Cancel any pending grace timer.
+        const existing = active.disconnectTimers.get(user.uid);
+        if (existing) {
+          clearTimeout(existing);
+          active.disconnectTimers.delete(user.uid);
+        }
+
+        active.sockets.set(user.uid, socket.id);
+        void socket.join(parsed.data.sessionId);
+
+        if (active.board) {
+          const seat = active.board.seats.findIndex((s) => s.uid === user.uid);
+          if (seat === -1) return ack({ ok: false, error: "not_in_session" });
+          active.board = setConnected(active.board, user.uid, true);
+          socket.emit("play:board", getPlayerView(active.board, seat));
+          broadcastBoardViews(io, parsed.data.sessionId);
+        } else {
+          broadcastPlayLobby(io, parsed.data.sessionId);
+        }
+        ack({ ok: true });
+      } catch (err) {
+        console.error("[play:rejoin]", err);
+        ack({ ok: false, error: "server_error" });
       }
-
-      active.sockets.set(user.uid, socket.id);
-      void socket.join(parsed.data.sessionId);
-
-      if (active.board) {
-        const seat = active.board.seats.findIndex((s) => s.uid === user.uid);
-        if (seat === -1) return ack({ ok: false, error: "not_in_session" });
-        active.board = setConnected(active.board, user.uid, true);
-        socket.emit("play:board", getPlayerView(active.board, seat));
-        broadcastBoardViews(io, parsed.data.sessionId);
-      } else {
-        broadcastPlayLobby(io, parsed.data.sessionId);
-      }
-      ack({ ok: true });
     },
   );
 }

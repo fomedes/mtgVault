@@ -289,12 +289,14 @@ export function registerPlayHandlers(io: Server, socket: Socket): void {
     );
     broadcastPlayLobby(io, parsed.data.sessionId);
 
-    void connectToDatabase().then(() =>
-      PlaySession.updateOne(
-        { sessionId: parsed.data.sessionId, "players.uid": user.uid },
-        { $set: { "players.$.isReady": parsed.data.ready } },
-      ),
-    );
+    void connectToDatabase()
+      .then(() =>
+        PlaySession.updateOne(
+          { sessionId: parsed.data.sessionId, "players.uid": user.uid },
+          { $set: { "players.$.isReady": parsed.data.ready } },
+        ),
+      )
+      .catch((err) => console.error("[playlobby:ready] persist failed:", err));
   });
 
   // ── playlobby:set-deck ─────────────────────────────────────────────────────
@@ -444,11 +446,13 @@ export function registerPlayHandlers(io: Server, socket: Socket): void {
     void socket.leave(parsed.data.sessionId);
     broadcastPlayLobby(io, parsed.data.sessionId);
 
-    void connectToDatabase().then(() =>
-      PlaySession.updateOne(
-        { sessionId: parsed.data.sessionId },
-        { $pull: { players: { uid: user.uid } } },
-      ),
-    );
+    void connectToDatabase()
+      .then(() =>
+        PlaySession.updateOne(
+          { sessionId: parsed.data.sessionId },
+          { $pull: { players: { uid: user.uid } } },
+        ),
+      )
+      .catch((err) => console.error("[playlobby:leave] persist failed:", err));
   });
 }

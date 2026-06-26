@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConnectionStatus } from "@/components/connection-status";
 import { emitWithTimeout, usePlaySocketConnection } from "@/hooks/use-play-socket";
 import { usePlayStore } from "@/store/play-store";
 import type { DeckOption } from "@/components/play/play-page-client";
@@ -144,6 +145,7 @@ function LobbyEntry({
 
   return (
     <div className="space-y-8">
+    <ConnectionStatus />
     <div className="grid gap-6 md:grid-cols-2">
       <section className="border-border bg-card rounded-lg border p-5">
         <h2 className="mb-4 text-lg font-semibold">Create a table</h2>
@@ -215,9 +217,6 @@ function LobbyEntry({
         >
           Join
         </Button>
-        {!connected && (
-          <p className="text-muted-foreground mt-3 text-xs">Connecting to the server…</p>
-        )}
         {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
       </section>
     </div>

@@ -189,12 +189,14 @@ export function registerLobbyHandlers(io: Server, socket: Socket): void {
     activeSession.state = { ...activeSession.state, players };
     broadcastLobby(io, sessionId);
 
-    void connectToDatabase().then(() =>
-      DraftSession.updateOne(
-        { sessionId, "players.uid": user.uid },
-        { $set: { "players.$.isReady": payload.ready } },
-      ),
-    );
+    void connectToDatabase()
+      .then(() =>
+        DraftSession.updateOne(
+          { sessionId, "players.uid": user.uid },
+          { $set: { "players.$.isReady": payload.ready } },
+        ),
+      )
+      .catch((err) => console.error("[draft ready] persist failed:", err));
   });
 
   // ── lobby:start ──────────────────────────────────────────────────────────
