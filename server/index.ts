@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import { evaluateAllowlist, normalizeEmail } from "@/lib/auth/allowlist";
 import { connectToDatabase } from "@/lib/db";
 import { getServerEnv, getSocketEnv } from "@/lib/env";
-import { verifyIdTokenResilient } from "@/lib/firebase-admin";
+import { probeGoogleCerts, verifyIdTokenResilient } from "@/lib/firebase-admin";
 import { AllowlistEntry } from "@/lib/models/AllowlistEntry";
 import { User } from "@/lib/models/User";
 import { registerLobbyHandlers } from "@/server/draft/lobby";
@@ -39,6 +39,13 @@ async function main() {
   const socketEnv = getSocketEnv();
   getServerEnv();
   await connectToDatabase();
+
+  // Boot self-test: can THIS host fetch Google's token-signing certs? If this
+  // logs "BAD" (an HTML page instead of JSON), Firebase token verification will
+  // fail for everyone — the line shows exactly what the host is getting back.
+  probeGoogleCerts()
+    .then((r) => console.log(`[startup] google certs probe: ${r}`))
+    .catch((err) => console.error("[startup] google certs probe error:", err));
 
   const httpServer = createServer((req, res) => {
     if (req.url === "/health") {

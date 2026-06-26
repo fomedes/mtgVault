@@ -19,6 +19,33 @@ export function getAdminAuth(): Auth {
   return getAuth(getAdminApp());
 }
 
+const GOOGLE_CERTS_URL =
+  "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+
+/**
+ * Fetch Google's token-signing cert endpoint directly and summarise the
+ * response. Used as a boot-time self-test so a host that gets an HTML page back
+ * (a blocked/shared IP "Sorry" page, a proxy/captive portal, or a redirect)
+ * instead of the expected JSON is immediately visible in the logs.
+ */
+export async function probeGoogleCerts(): Promise<string> {
+  try {
+    const res = await fetch(GOOGLE_CERTS_URL, { redirect: "manual" });
+    const body = await res.text();
+    const snippet = body.slice(0, 200).replace(/\s+/g, " ").trim();
+    const looksJson = (res.headers.get("content-type") ?? "").includes("json");
+    return [
+      looksJson && res.status === 200 ? "OK" : "BAD",
+      `status=${res.status}`,
+      `type=${res.headers.get("content-type") ?? "-"}`,
+      `location=${res.headers.get("location") ?? "-"}`,
+      `body="${snippet}"`,
+    ].join(" ");
+  } catch (err) {
+    return `FETCH-THREW ${(err as Error)?.name}: ${(err as Error)?.message}`;
+  }
+}
+
 /** A failure to FETCH Google's public signing keys (a transient infra/egress
  *  blip) rather than a genuinely bad token — these are worth retrying. */
 function isTransientVerifyError(err: unknown): boolean {
