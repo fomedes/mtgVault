@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import { evaluateAllowlist, normalizeEmail } from "@/lib/auth/allowlist";
 import { connectToDatabase } from "@/lib/db";
 import { getServerEnv, getSocketEnv } from "@/lib/env";
-import { getAdminAuth } from "@/lib/firebase-admin";
+import { verifyIdTokenResilient } from "@/lib/firebase-admin";
 import { AllowlistEntry } from "@/lib/models/AllowlistEntry";
 import { User } from "@/lib/models/User";
 import { registerLobbyHandlers } from "@/server/draft/lobby";
@@ -74,7 +74,7 @@ async function main() {
 
       let decoded;
       try {
-        decoded = await getAdminAuth().verifyIdToken(token);
+        decoded = await verifyIdTokenResilient(token);
       } catch (err) {
         console.warn(
           `[auth] reject: token verify failed (origin=${origin}):`,
